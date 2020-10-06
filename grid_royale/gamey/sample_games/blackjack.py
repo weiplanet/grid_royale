@@ -231,7 +231,9 @@ def demo():
         RandomStrategy(),
         AlwaysHitStrategy(),
         AlwaysStickStrategy(),
+        ThresholdStrategy(15),
         ThresholdStrategy(16),
+        ThresholdStrategy(17),
         *learning_strategies,
     ]
 
