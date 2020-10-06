@@ -48,5 +48,5 @@ proj.launch-config = {loc('../../dude/flucker.py'): ('project',
          ''))}
 proj.main-file = loc('../../run_grid_royale.py')
 testing.auto-test-file-specs = (('regex',
-                                 'simulate_humans/tests.*/test[^./]*.py.?$'),)
+                                 'grid_royale/tests.*/test[^./]*.py.?$'),)
 testing.test-framework = {None: ':internal pytest'}
