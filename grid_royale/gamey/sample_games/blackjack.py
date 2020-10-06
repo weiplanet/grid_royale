@@ -17,7 +17,7 @@ import dataclasses
 import more_itertools
 import numpy as np
 
-import gamey
+from grid_royale import gamey
 
 
 def sum_cards(cards: Iterable[int]) -> int:
