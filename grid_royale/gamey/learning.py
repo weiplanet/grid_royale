@@ -30,11 +30,9 @@ from . import utils
 
 
 class ModelBasedLearningStrategy(Strategy):
-    def __init__(self, observation_type: Type[Observation], curiosity: numbers.Real = 2,
-                 gamma: numbers.Real = 0.9, learning_delay: int = 10) -> None:
-        NiceStrategy.__init__(self, observation_type=observation_type)
+    def __init__(self, curiosity: numbers.Real = 2, gamma: numbers.Real = 0.9,
+                 learning_delay: int = 10) -> None:
         self.q_map = QMap()
-        self.observation_type = observation_type
         self.curiosity = curiosity
         self.gamma = gamma
         self.learning_delay = learning_delay

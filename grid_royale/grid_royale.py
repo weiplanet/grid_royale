@@ -702,8 +702,10 @@ logging.getLogger('tensorflow').addFilter(
 )
 
 class SimpleStrategy(gamey.Strategy):
+
+    observation_type = Observation
+
     def __init__(self, epsilon: int = 0.2):
-        gamey.Strategy.__init__(self, observation_type=Observation)
         self.epsilon = epsilon
 
 
@@ -727,11 +729,11 @@ class SimpleStrategy(gamey.Strategy):
 
 class Strategy(gamey.AwesomeStrategy):
 
-    # reward_name = 'cute_reward'
+    observation_type = Observation
+
     def __init__(self, universe: Universe, **kwargs) -> None:
         self.universe = universe
-        gamey.AwesomeStrategy.__init__(self, observation_type=Observation,
-                                       training_batch_size=10, **kwargs)
+        gamey.AwesomeStrategy.__init__(self, training_batch_size=10, **kwargs)
 
     def get_aggro(self, n_states: int = 100) -> numbers.Real:
         iterator = itertools.cycle(self.universe.core_strategies)
