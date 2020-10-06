@@ -218,9 +218,7 @@ class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrate
 
 
 
-def demo():
-    N_TRAINING_GAMES = 1_000
-
+def demo(n_training_games: int = 1_000) -> None:
     print('Starting Blackjack demo.')
 
     # awesome_strategy.get_score(n=1_000)
@@ -253,14 +251,14 @@ def demo():
     print_summary()
 
     print(f"\nThat's nice. Now we want to see that the learning strategies can be better than "
-          f"the dumb ones, if we give them time to learn. Let's play {N_TRAINING_GAMES:,} "
+          f"the dumb ones, if we give them time to learn. Let's play {n_training_games:,} "
           "games on each of the two learning strategies.\n")
 
     for learning_strategy in learning_strategies:
         learning_strategy: gamey.Strategy
-        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ', end='')
+        print(f'Training {learning_strategy} on {n_training_games:,} games... ', end='')
         sys.stdout.flush()
-        learning_strategy.get_score(n=N_TRAINING_GAMES)
+        learning_strategy.get_score(n=n_training_games)
         print('Done.')
 
     print("\nNow let's run the old comparison again, and see what's the new score for the "
