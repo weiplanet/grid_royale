@@ -2,4 +2,4 @@ from .base import (Observation, PlayerInfo, State, NiceState, Action, StateActio
                    ActionObservation)
 from .strategizing import Strategy, RandomStrategy
 from .awesome import AwesomeStrategy
-from .learning import LearningStrategy
+from .learning import ModelBasedLearningStrategy

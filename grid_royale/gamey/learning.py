@@ -29,7 +29,7 @@ from .base import Observation, Action, StateActionReward, ActionObservation
 from . import utils
 
 
-class LearningStrategy(NiceStrategy):
+class ModelBasedLearningStrategy(Strategy):
     def __init__(self, observation_type: Type[Observation], curiosity: numbers.Real = 2,
                  gamma: numbers.Real = 0.9, learning_delay: int = 10) -> None:
         NiceStrategy.__init__(self, observation_type=observation_type)

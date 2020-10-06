@@ -203,12 +203,12 @@ class ThresholdStrategy(gamey.Strategy):
         return f'(threshold={self.threshold})'
 
 
-learning_strategy = gamey.LearningStrategy(BlackjackState, gamma=1)
-learning_strategy.get_score(1_000)
+learning_strategy = gamey.ModelBasedLearningStrategy(BlackjackState, gamma=1)
+# learning_strategy.get_score(1_000)
 awesome_strategy = gamey.AwesomeStrategy(
     BlackjackState, gamma=1
 )
-awesome_strategy.get_score(n=1_000)
+# awesome_strategy.get_score(n=1_000)
 strategies = [
     gamey.RandomStrategy(BlackjackState),
     AlwaysHitStrategy(BlackjackState), AlwaysStickStrategy(BlackjackState),
@@ -217,14 +217,16 @@ strategies = [
 ]
 
 
-def main():
-    with concurrent.futures.ThreadPoolExecutor(5) as executor:
-        # executor.map = lambda *args, **kwargs: tuple(map(*args, **kwargs))
-        scores = executor.map(
+def demo():
+    # executor.map = lambda *args, **kwargs: tuple(map(*args, **kwargs))
+    print(strategies[0].get_score(100))
+    scores = tuple(
+        map(
             functools.partial(gamey.Strategy.get_score,
                               n=1_000),
             strategies
         )
+    )
 
     scores_and_strategies = sorted(zip(scores, strategies), reverse=True,
                                    key=lambda x: x[0])
@@ -233,5 +235,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    demo()
 
