@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 import inspect
 import abc
 import random
@@ -258,6 +259,7 @@ def demo():
     for learning_strategy in learning_strategies:
         learning_strategy: gamey.Strategy
         print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ', end='')
+        sys.stdout.flush()
         learning_strategy.get_score(n=N_TRAINING_GAMES)
         print('Done.')
 
