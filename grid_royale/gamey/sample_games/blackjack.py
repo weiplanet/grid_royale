@@ -252,8 +252,8 @@ def demo():
 
     print_summary()
 
-    print(f"\nThat's nice. Now we want to see that the smarter strategies can be better than "
-          f"the dumber ones, if we give them time to learn. Let's play {N_TRAINING_GAMES:,} "
+    print(f"\nThat's nice. Now we want to see that the learning strategies can be better than "
+          f"the dumb ones, if we give them time to learn. Let's play {N_TRAINING_GAMES:,} "
           "games on each of the two learning strategies.\n")
 
     for learning_strategy in learning_strategies:
