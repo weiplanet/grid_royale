@@ -83,9 +83,9 @@ class TrainingData:
 
 
 class AwesomeStrategy(NiceStrategy):
-    def __init__(self, observation_type: Type[Observation], *, epsilon: numbers.Real = 0.3,
-                 gamma: numbers.Real = 0.9, training_batch_size: int = 100,
-                 loss: str = 'mse', optimizer: str = 'rmsprop', n_epochs: int = 50) -> None:
+    def __init__(self, *, epsilon: numbers.Real = 0.3, gamma: numbers.Real = 0.9,
+                 training_batch_size: int = 100, loss: str = 'mse', optimizer: str = 'rmsprop',
+                 n_epochs: int = 50) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.n_epochs = n_epochs
@@ -95,7 +95,7 @@ class AwesomeStrategy(NiceStrategy):
             layers=(
                 keras.layers.Dense(
                     128, activation='relu',
-                    input_dim=observation_type.n_neurons
+                    input_dim=self.observation_type.n_neurons
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
@@ -107,7 +107,7 @@ class AwesomeStrategy(NiceStrategy):
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
-                     observation_type.action_type.n_neurons, # activation='relu'
+                     self.observation_type.action_type.n_neurons, # activation='relu'
                 ),
 
             ),
