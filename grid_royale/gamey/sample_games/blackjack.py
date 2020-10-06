@@ -236,40 +236,32 @@ def demo():
     ]
 
     print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 100 games "
-          f"on each and observe the scores:\n")
+          f"on each strategy and observe the scores:\n")
 
-    score_and_strategy = sorted(((strategy.get_score(100), strategy) for strategy in strategies),
-                                reverse=True)
-    for score, strategy in scores_and_strategies:
-        print(f'    {strategy}: '.ljust(40), end='')
-        print(score)
+    def print_summary():
+        scores_and_strategies = sorted(((strategy.get_score(100), strategy) for strategy in
+                                        strategies), reverse=True)
+        for score, strategy in scores_and_strategies:
+            print(f'    {strategy}: '.ljust(40), end='')
+            print(score)
+
+    print_summary()
 
     print(f"\nThat's nice. Now we want to see that the smarter strategies can be better than "
           f"the dumber ones, if we give them time to learn. Let's play {N_TRAINING_GAMES:,} "
           "games on each of the two learning strategies.\n")
 
     for learning_strategy in learning_strategies:
-        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ')
+        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ', end='')
+        print('Done.')
         learning_strategy: gamey.Strategy
         learning_strategy.get_score(n=N_TRAINING_GAMES)
 
+    print("\nNow let's run the old comparison again, and see what's the new score for the "
+          "learning strategies:\n")
 
+    print_summary()
 
-
-    # executor.map = lambda *args, **kwargs: tuple(map(*args, **kwargs))
-    print(strategies[0].get_score(100))
-    scores = tuple(
-        map(
-            functools.partial(gamey.Strategy.get_score,
-                              n=1_000),
-            strategies
-        )
-    )
-
-    scores_and_strategies = sorted(zip(scores, strategies), reverse=True,
-                                   key=lambda x: x[0])
-    for score, strategy in scores_and_strategies:
-        print(f'{score:04.0f}: {strategy}')
 
 
 if __name__ == '__main__':
