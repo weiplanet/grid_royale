@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+import math
+import inspect
+import re
+import abc
+import random
+import itertools
+import collections.abc
+import statistics
+import concurrent.futures
+import enum
+import functools
+import numbers
+from typing import (Iterable, Union, Optional, Tuple, Any, Iterator, Type,
+                    Sequence, Callable)
+import dataclasses
+
+import more_itertools
+import keras.models
+import tensorflow as tf
+import numpy as np
+
+from .strategizing import Strategy, NiceStrategy
+from .base import PlayerState, Action, StateActionReward, ActionPlayerState
+from . import utils
+
+
+class LearningStrategy(NiceStrategy):
+    def __init__(self, player_state_type: Type[PlayerState], curiosity: numbers.Real = 2,
+                 gamma: numbers.Real = 0.9, learning_delay: int = 10) -> None:
+        NiceStrategy.__init__(self, player_state_type=player_state_type)
+        self.q_map = QMap()
+        self.player_state_type = player_state_type
+        self.curiosity = curiosity
+        self.gamma = gamma
+        self.learning_delay = learning_delay
+
+
+    def decide_action_for_player_state(self, player_state: PlayerState,
+                                       extra: Any = None) -> Action:
+        action = max(
+            player_state.legal_actions,
+            key=lambda action: self.q_map.get_ucb(
+                player_state, action, curiosity=self.curiosity
+            )
+        )
+        return action
+
+    def train(self, player_state: PlayerState, action: Action, q: numbers.Number) -> None:
+        self.q_map.add_sample(player_state, action, q)
+
+    def get_player_state_v(self, player_state: PlayerState) -> numbers.Real:
+        raise NotImplementedError
+        # return max(self.get_q_for_player_state_action(player_state, action) for action in
+                   # player_state.legal_actions)
+
+
+
+
+def _zero_maker():
+    return 0
+
+
+class QMap(collections.abc.Mapping):
+    def __init__(self) -> None:
+        self._q_values = collections.defaultdict(_zero_maker)
+        self._n_samples = collections.defaultdict(_zero_maker)
+        self.n_total_samples = 0
+
+    __len__ = lambda self: len(self._q_values)
+    __iter__ = lambda self: iter(self._q_values)
+
+    def __getitem__(self, player_state_and_action: Iterable) -> numbers.Real:
+        return self._q_values[self._to_key(*player_state_and_action)]
+
+    def _to_key(self, player_state: PlayerState, action: Action) -> Tuple(bytes, Action):
+        return (player_state.to_neurons().tobytes(), action)
+
+
+    def add_sample(self, player_state: PlayerState, action: Action, q: numbers.Real) -> None:
+        key = self._to_key(player_state, action)
+        self._q_values[key] = (
+            self._q_values[key] *
+            (self._n_samples[key] / (self._n_samples[key] + 1)) +
+            q * (1 / (self._n_samples[key] + 1))
+        )
+        self._n_samples[key] += 1
+        self.n_total_samples += 1
+
+    def get_ucb(self, player_state: PlayerState, action: Action,
+                curiosity: numbers.Real) -> numbers.Real:
+        key = self._to_key(player_state, action)
+        return self._q_values[key] + curiosity * math.sqrt(
+            utils.cute_div(
+                math.log(self.n_total_samples + 2),
+                self._n_samples[key]
+            )
+        )
+
+

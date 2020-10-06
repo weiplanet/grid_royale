@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <title>Pal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/brython/3.8.10/brython.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/brython/3.8.10/brython_stdlib.min.js"></script>
+    <style type='text/css'>
+    body {
+      background: white;
+    }
+    #main_container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #canvas {
+      font-family: Consolas, monospace;
+      width: 720px;
+      height: 720px;
+    }
+
+
+    #controls {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #game-selector {
+      padding: 8px;
+    }
+
+
+    #timepoint-text {
+      font-family: Consolas, monospace;
+      font-size: 150%
+      height: 20px;
+      width: 100px;
+      text-align: center;
+    }
+
+    #speed-slider {
+      width: 80px;
+    }
+
+    #timepoint-slider {
+      width: 100%;
+    }
+
+    </style>
+</head>
+
+
+<body onload='brython()'>
+
+  <script type='text/javascript' src='pal.js'></script>
+  <script type='text/python' src='pal.py'></script>
+
+  <div id='main_container'>
+    <canvas id='canvas' width='720' height='720'></canvas>
+    <div id='controls'>
+      <select id='game-selector'>
+      </select>
+      <div id='timepoint-text'>
+        000000
+      </div>
+      <button id='play-pause'>
+        <img src='play.png'>
+      </button>
+      <input id='speed-slider' type='range' name='speed-slider' min='0.2' max='8' step='0.1' value='1.5'>
+      <button id='update-button'>Update</button>
+    </div>
+    <input id='timepoint-slider' type='range' name='timepoint-slider' min='0' max='1' value='0'>
+  </div>
+
+
+</body>
+
+</html>
