@@ -727,13 +727,13 @@ class SimpleStrategy(gamey.Strategy):
 
 
 
-class Strategy(gamey.AwesomeStrategy):
+class Strategy(gamey.ModelFreeLearningStrategy):
 
     observation_type = Observation
 
     def __init__(self, universe: Universe, **kwargs) -> None:
         self.universe = universe
-        gamey.AwesomeStrategy.__init__(self, training_batch_size=10, **kwargs)
+        gamey.ModelFreeLearningStrategy.__init__(self, training_batch_size=10, **kwargs)
 
     def get_aggro(self, n_states: int = 100) -> numbers.Real:
         iterator = itertools.cycle(self.universe.core_strategies)

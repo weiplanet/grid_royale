@@ -212,33 +212,48 @@ class RandomStrategy(BlackjackStrategy, gamey.RandomStrategy):
 class ModelBasedLearningStrategy(BlackjackStrategy, gamey.ModelBasedLearningStrategy):
     pass
 
-class AwesomeStrategy(BlackjackStrategy, gamey.AwesomeStrategy):
+class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrategy):
     pass
 
 
 
 def demo():
+    N_TRAINING_GAMES = 1_000
+
     print('Starting Blackjack demo.')
 
     # awesome_strategy.get_score(n=1_000)
+    learning_strategies = [
+        ModelBasedLearningStrategy(gamma=1),
+        ModelFreeLearningStrategy(gamma=1)
+    ]
     strategies = [
         RandomStrategy(),
         AlwaysHitStrategy(),
         AlwaysStickStrategy(),
-        learning_strategy := ModelBasedLearningStrategy(gamma=1),
         ThresholdStrategy(16),
-        awesome_strategy := AwesomeStrategy(gamma=1)
+        *learning_strategies,
     ]
 
     print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 100 games "
           f"on each and observe the scores:\n")
 
-    for strategy in strategies:
+    score_and_strategy = sorted(((strategy.get_score(100), strategy) for strategy in strategies),
+                                reverse=True)
+    for score, strategy in scores_and_strategies:
         print(f'    {strategy}: '.ljust(40), end='')
-        print(strategy.get_score(100))
+        print(score)
 
     print(f"\nThat's nice. Now we want to see that the smarter strategies can be better than "
-          f"the dumber ones, if we give them time to learn.\n")
+          f"the dumber ones, if we give them time to learn. Let's play {N_TRAINING_GAMES:,} "
+          "games on each of the two learning strategies.\n")
+
+    for learning_strategy in learning_strategies:
+        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ')
+        learning_strategy: gamey.Strategy
+        learning_strategy.get_score(n=N_TRAINING_GAMES)
+
+
 
 
     # executor.map = lambda *args, **kwargs: tuple(map(*args, **kwargs))

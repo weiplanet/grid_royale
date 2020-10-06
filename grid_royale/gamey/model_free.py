@@ -32,7 +32,7 @@ def _fit_external(model: keras.Model, *args, **kwargs) -> list:
     return model.get_weights()
 
 class TrainingData:
-    def __init__(self, awesome_strategy: AwesomeStrategy, max_size=10_000) -> None:
+    def __init__(self, awesome_strategy: ModelFreeLearningStrategy, max_size=10_000) -> None:
         self.awesome_strategy = awesome_strategy
         self.max_size = max_size
         self.counter = 0
@@ -82,7 +82,7 @@ class TrainingData:
 
 
 
-class AwesomeStrategy(NiceStrategy):
+class ModelFreeLearningStrategy(NiceStrategy):
     def __init__(self, *, epsilon: numbers.Real = 0.3, gamma: numbers.Real = 0.9,
                  training_batch_size: int = 100, loss: str = 'mse', optimizer: str = 'rmsprop',
                  n_epochs: int = 50) -> None:
