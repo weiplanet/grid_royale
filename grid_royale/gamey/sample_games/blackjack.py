@@ -60,7 +60,7 @@ _card_distribution = tuple(range(1, 10 + 1)) + (10,) * 3
 def get_random_card() -> int:
     return random.choice(_card_distribution)
 
-class BlackjackState(gamey.Observation):
+class BlackjackObservation(gamey.Observation):
 
     reward = 0
     action_type = BlackjackAction
@@ -120,23 +120,23 @@ class BlackjackState(gamey.Observation):
 
 
 
-    def get_next_observation(self, action: BlackjackAction) -> BlackjackState:
+    def get_next_observation(self, action: BlackjackAction) -> BlackjackObservation:
         if action not in self.legal_actions:
             raise gamey.exceptions.IllegalAction(action)
         if self.player_stuck or action == BlackjackAction.stick:
-            return BlackjackState(
+            return BlackjackObservation(
                 self.player_cards,
                 self.dealer_cards + (get_random_card(),)
             )
         else:
-            return BlackjackState(
+            return BlackjackObservation(
                 self.player_cards + (get_random_card(),),
                 self.dealer_cards
             )
 
     @staticmethod
-    def make_initial() -> BlackjackState:
-        return BlackjackState(
+    def make_initial() -> BlackjackObservation:
+        return BlackjackObservation(
             (get_random_card(), get_random_card()),
             (get_random_card(),)
         )
@@ -171,26 +171,29 @@ class BlackjackState(gamey.Observation):
     n_neurons = 5
 
 
+class BlackjackStrategy(gamey.Strategy):
+    observation_type = BlackjackObservation
 
-class AlwaysHitStrategy(gamey.Strategy):
-    def decide_action_for_observation(self, observation: BlackjackState,
+
+class AlwaysHitStrategy(BlackjackStrategy):
+    def decide_action_for_observation(self, observation: BlackjackObservation,
                                        extra: Any = None) -> BlackjackAction:
         return (BlackjackAction.hit if (BlackjackAction.hit in
                                        observation.legal_actions)
                 else BlackjackAction.wait)
 
-class AlwaysStickStrategy(gamey.Strategy):
-    def decide_action_for_observation(self, observation: BlackjackState,
+class AlwaysStickStrategy(BlackjackStrategy):
+    def decide_action_for_observation(self, observation: BlackjackObservation,
                                        extra: Any = None) -> BlackjackAction:
         return (BlackjackAction.stick if (BlackjackAction.stick in
                                           observation.legal_actions)
                 else BlackjackAction.wait)
 
-class ThresholdStrategy(gamey.Strategy):
+class ThresholdStrategy(BlackjackStrategy):
     def __init__(self, threshold: int = 17) -> None:
         self.threshold = threshold
 
-    def decide_action_for_observation(self, observation: BlackjackState,
+    def decide_action_for_observation(self, observation: BlackjackObservation,
                                        extra: Any = None) -> BlackjackAction:
         if BlackjackAction.wait in observation.legal_actions:
             return BlackjackAction.wait
@@ -203,6 +206,15 @@ class ThresholdStrategy(gamey.Strategy):
         return f'(threshold={self.threshold})'
 
 
+class RandomStrategy(BlackjackStrategy, gamey.RandomStrategy):
+    pass
+
+class ModelBasedLearningStrategy(BlackjackStrategy, gamey.ModelBasedLearningStrategy):
+    pass
+
+class AwesomeStrategy(BlackjackStrategy, gamey.AwesomeStrategy):
+    pass
+
 
 
 def demo():
@@ -210,20 +222,20 @@ def demo():
 
     # awesome_strategy.get_score(n=1_000)
     strategies = [
-        gamey.RandomStrategy(BlackjackState),
-        AlwaysHitStrategy(BlackjackState),
-        AlwaysStickStrategy(BlackjackState),
-        learning_strategy := gamey.ModelBasedLearningStrategy(BlackjackState, gamma=1),
+        RandomStrategy(),
+        AlwaysHitStrategy(),
+        AlwaysStickStrategy(),
+        learning_strategy := ModelBasedLearningStrategy(gamma=1),
         ThresholdStrategy(16),
-        awesome_strategy := gamey.AwesomeStrategy(BlackjackState, gamma=1)
+        awesome_strategy := AwesomeStrategy(gamma=1)
     ]
 
     print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 100 games "
           f"on each and observe the scores:\n")
 
     for strategy in strategies:
-        print(f'    {strategy}: ', end='')
-        print(strategies.get_score(100))
+        print(f'    {strategy}: '.ljust(40), end='')
+        print(strategy.get_score(100))
 
     print(f"\nThat's nice. Now we want to see that the smarter strategies can be better than "
           f"the dumber ones, if we give them time to learn.\n")

@@ -31,9 +31,7 @@ class Strategy(abc.ABC):
 
     gamma: numbers.Real = 1
     reward_name: str = 'reward'
-
-    def __init__(self, observation_type: Type[Observation]) -> None:
-        self.observation_type = observation_type
+    observation_type: Type[Observation]
 
     def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
                   forced_gamma: Optional[numbers.Real] = None,
