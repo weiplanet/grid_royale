@@ -172,6 +172,11 @@ class BlackjackObservation(gamey.Observation):
     n_neurons = 5
 
 
+class BlackjackGame:
+    action_type
+
+
+
 class BlackjackStrategy(gamey.Strategy):
     observation_type = BlackjackObservation
 

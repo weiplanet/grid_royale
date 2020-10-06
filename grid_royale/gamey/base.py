@@ -202,6 +202,18 @@ class NiceState(State):
         return self.get_next_state_from_actions(player_id_to_action)
 
 
+class Game:
+    State: Type[State]
+    Observation: Type[Observation]
+    Action: Type[Action]
+
+    def __init__(self):
+        assert issubclass(self.State, State)
+        assert issubclass(self.Observation, Observation)
+        assert issubclass(self.Action, Action)
+
+
+
 
 
 from . import strategizing
