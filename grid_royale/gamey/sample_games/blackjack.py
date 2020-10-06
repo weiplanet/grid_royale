@@ -203,21 +203,32 @@ class ThresholdStrategy(gamey.Strategy):
         return f'(threshold={self.threshold})'
 
 
-learning_strategy = gamey.ModelBasedLearningStrategy(BlackjackState, gamma=1)
-# learning_strategy.get_score(1_000)
-awesome_strategy = gamey.AwesomeStrategy(
-    BlackjackState, gamma=1
-)
-# awesome_strategy.get_score(n=1_000)
-strategies = [
-    gamey.RandomStrategy(BlackjackState),
-    AlwaysHitStrategy(BlackjackState), AlwaysStickStrategy(BlackjackState),
-    # *(ThresholdStrategy(i) for i in range(3, 21)),
-    learning_strategy, awesome_strategy
-]
 
 
 def demo():
+    print('Starting Blackjack demo.')
+
+    # awesome_strategy.get_score(n=1_000)
+    strategies = [
+        gamey.RandomStrategy(BlackjackState),
+        AlwaysHitStrategy(BlackjackState),
+        AlwaysStickStrategy(BlackjackState),
+        learning_strategy := gamey.ModelBasedLearningStrategy(BlackjackState, gamma=1),
+        ThresholdStrategy(16),
+        awesome_strategy := gamey.AwesomeStrategy(BlackjackState, gamma=1)
+    ]
+
+    print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 100 games "
+          f"on each and observe the scores:\n")
+
+    for strategy in strategies:
+        print(f'    {strategy}: ', end='')
+        print(strategies.get_score(100))
+
+    print(f"\nThat's nice. Now we want to see that the smarter strategies can be better than "
+          f"the dumber ones, if we give them time to learn.\n")
+
+
     # executor.map = lambda *args, **kwargs: tuple(map(*args, **kwargs))
     print(strategies[0].get_score(100))
     scores = tuple(
