@@ -21,7 +21,7 @@ import keras.models
 import tensorflow as tf
 import numpy as np
 
-from .base import PlayerState, Action, StateActionReward, ActionPlayerState
+from .base import Observation, Action, StateActionReward, ActionObservation
 from . import utils
 
 
@@ -32,22 +32,22 @@ class Strategy(abc.ABC):
     gamma: numbers.Real = 1
     reward_name: str = 'reward'
 
-    def __init__(self, player_state_type: Type[PlayerState]) -> None:
-        self.player_state_type = player_state_type
+    def __init__(self, observation_type: Type[Observation]) -> None:
+        self.observation_type = observation_type
 
-    def get_score(self, n: int = 1_000, player_state_factory: Optional[Callable] = None,
+    def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
                   forced_gamma: Optional[numbers.Real] = None,
                   max_game_length: Optional[int] = None) -> int:
-        make_player_state = (self.player_state_type.make_initial if player_state_factory is None
-                      else player_state_factory)
+        make_observation = (self.observation_type.make_initial if observation_factory is None
+                      else observation_factory)
         gamma = self.gamma if not forced_gamma else forced_gamma
         return sum(
             sum(
-                (gamma ** i) * getattr(action_player_state.player_state, self.reward_name)
-                for i, action_player_state in
+                (gamma ** i) * getattr(action_observation.observation, self.reward_name)
+                for i, action_observation in
                 enumerate(
                     more_itertools.islice_extended(
-                        self.iterate_game(make_player_state())
+                        self.iterate_game(make_observation())
                     )[:max_game_length]
                 )
             )
@@ -55,19 +55,19 @@ class Strategy(abc.ABC):
         )
 
     @abc.abstractmethod
-    def decide_action_for_player_state(self, player_state: PlayerState,
+    def decide_action_for_observation(self, observation: Observation,
                                        extra: Any = None) -> Action:
         raise NotImplementedError
 
-    def iterate_game(self, player_state: PlayerState) -> Iterator[ActionPlayerState]:
-        action_player_state = ActionPlayerState(None, player_state)
+    def iterate_game(self, observation: Observation) -> Iterator[ActionObservation]:
+        action_observation = ActionObservation(None, observation)
         while True:
-            yield action_player_state
-            if action_player_state.player_state.is_end:
+            yield action_observation
+            if action_observation.observation.is_end:
                 return
-            action_player_state = ActionPlayerState(
-                (action := self.decide_action_for_player_state(action_player_state.player_state)),
-                action_player_state.player_state.get_next_player_state(action)
+            action_observation = ActionObservation(
+                (action := self.decide_action_for_observation(action_observation.observation)),
+                action_observation.observation.get_next_observation(action)
             )
 
     def __repr__(self) -> str:
@@ -78,23 +78,23 @@ class Strategy(abc.ABC):
 
 
 class RandomStrategy(Strategy):
-    def decide_action_for_player_state(self, player_state: PlayerState, *,
+    def decide_action_for_observation(self, observation: Observation, *,
                                        extra: Any = None) -> Action:
-        return random.choice(player_state.legal_actions)
+        return random.choice(observation.legal_actions)
 
 
 class NiceStrategy(Strategy):
     @abc.abstractmethod
-    def get_player_state_v(self, player_state: PlayerState) -> numbers.Real:
+    def get_observation_v(self, observation: Observation) -> numbers.Real:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_qs_for_player_states(self, player_states: Sequence[PlayerState]) \
+    def get_qs_for_observations(self, observations: Sequence[Observation]) \
                                                             -> Tuple[Mapping[Action, numbers.Real]]:
         raise NotImplementedError
 
-    def get_qs_for_player_state(self, player_state: PlayerState) -> Mapping[Action, numbers.Real]:
-        return more_itertools.one(self.get_qs_for_player_states((player_state,)))
+    def get_qs_for_observation(self, observation: Observation) -> Mapping[Action, numbers.Real]:
+        return more_itertools.one(self.get_qs_for_observations((observation,)))
 
 
 

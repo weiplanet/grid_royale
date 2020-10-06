@@ -23,7 +23,7 @@ import more_itertools
 import keras.models
 import numpy as np
 
-from .base import StateActionReward, PlayerState, Action, ActionPlayerState
+from .base import StateActionReward, Observation, Action, ActionObservation
 from .strategizing import Strategy, NiceStrategy
 from . import utils
 
@@ -37,26 +37,26 @@ class TrainingData:
         self.max_size = max_size
         self.counter = 0
         self._last_trained_batch = 0
-        self.old_player_state_neuron_array = np.zeros(
-            (max_size, awesome_strategy.player_state_type.n_neurons)
+        self.old_observation_neuron_array = np.zeros(
+            (max_size, awesome_strategy.observation_type.n_neurons)
         )
-        self.new_player_state_neuron_array = np.zeros(
-            (max_size, awesome_strategy.player_state_type.n_neurons)
+        self.new_observation_neuron_array = np.zeros(
+            (max_size, awesome_strategy.observation_type.n_neurons)
         )
         self.action_neuron_array = np.zeros(
-            (max_size,awesome_strategy.player_state_type.action_type.n_neurons)
+            (max_size,awesome_strategy.observation_type.action_type.n_neurons)
         )
         self.reward_array = np.zeros(max_size)
         self.are_not_end_array = np.zeros(max_size)
 
-    def add(self, old_player_state: PlayerState, action: Action,
-            new_player_state: PlayerState) -> None:
-        self.old_player_state_neuron_array[self.counter_modulo] = old_player_state.to_neurons()
+    def add(self, old_observation: Observation, action: Action,
+            new_observation: Observation) -> None:
+        self.old_observation_neuron_array[self.counter_modulo] = old_observation.to_neurons()
         self.action_neuron_array[self.counter_modulo] = action.to_neurons()
-        self.new_player_state_neuron_array[self.counter_modulo] = new_player_state.to_neurons()
-        self.reward_array[self.counter_modulo] = getattr(new_player_state,
+        self.new_observation_neuron_array[self.counter_modulo] = new_observation.to_neurons()
+        self.reward_array[self.counter_modulo] = getattr(new_observation,
                                                          self.awesome_strategy.reward_name)
-        self.are_not_end_array[self.counter_modulo] = int(not new_player_state.is_end)
+        self.are_not_end_array[self.counter_modulo] = int(not new_observation.is_end)
         self.counter += 1
 
 
@@ -83,10 +83,10 @@ class TrainingData:
 
 
 class AwesomeStrategy(NiceStrategy):
-    def __init__(self, player_state_type: Type[PlayerState], *, epsilon: numbers.Real = 0.3,
+    def __init__(self, observation_type: Type[Observation], *, epsilon: numbers.Real = 0.3,
                  gamma: numbers.Real = 0.9, training_batch_size: int = 100,
                  loss: str = 'mse', optimizer: str = 'rmsprop', n_epochs: int = 50) -> None:
-        NiceStrategy.__init__(self, player_state_type=player_state_type)
+        NiceStrategy.__init__(self, observation_type=observation_type)
         self.epsilon = epsilon
         self.gamma = gamma
         self.n_epochs = n_epochs
@@ -96,7 +96,7 @@ class AwesomeStrategy(NiceStrategy):
             layers=(
                 keras.layers.Dense(
                     128, activation='relu',
-                    input_dim=player_state_type.n_neurons
+                    input_dim=observation_type.n_neurons
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
@@ -108,7 +108,7 @@ class AwesomeStrategy(NiceStrategy):
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
-                     player_state_type.action_type.n_neurons, # activation='relu'
+                     observation_type.action_type.n_neurons, # activation='relu'
                 ),
 
             ),
@@ -121,15 +121,15 @@ class AwesomeStrategy(NiceStrategy):
 
 
     def train(self, executor: Optional[concurrent.futures.Executor] = None) -> None:
-        n_actions = len(self.player_state_type.action_type)
+        n_actions = len(self.observation_type.action_type)
         slicer = ((lambda x: x) if self.training_data.filled_max_size else
                   (lambda x: x[:self.training_data.counter_modulo]))
-        old_player_state_neurons = slicer(self.training_data.old_player_state_neuron_array)
-        new_player_state_neurons = slicer(self.training_data.new_player_state_neuron_array)
+        old_observation_neurons = slicer(self.training_data.old_observation_neuron_array)
+        new_observation_neurons = slicer(self.training_data.new_observation_neuron_array)
         action_neurons = slicer(self.training_data.action_neuron_array)
         are_not_ends = slicer(self.training_data.are_not_end_array)
         rewards = slicer(self.training_data.reward_array)
-        n_data_points = old_player_state_neurons.shape[0]
+        n_data_points = old_observation_neurons.shape[0]
 
         if self._fit_future is not None:
             weights = self._fit_future.result()
@@ -138,7 +138,7 @@ class AwesomeStrategy(NiceStrategy):
 
         old_fuck, new_fuck = np.split(
             self.model.predict(
-                np.concatenate((old_player_state_neurons, new_player_state_neurons))
+                np.concatenate((old_observation_neurons, new_observation_neurons))
             ),
             2
         )
@@ -152,7 +152,7 @@ class AwesomeStrategy(NiceStrategy):
         )
 
         fit_arguments = {
-            'x': old_player_state_neurons,
+            'x': old_observation_neurons,
             'y': old_fuck,
             'epochs': max(1, int(self.n_epochs *
                                  (n_data_points / self.training_data.max_size))),
@@ -168,26 +168,26 @@ class AwesomeStrategy(NiceStrategy):
         self.training_data.mark_trained()
 
 
-    def get_qs_for_player_states(self, player_states: Optional[Sequence[PlayerState]] = None, *,
-                                 player_states_neurons: Optional[np.ndarray] = None) \
+    def get_qs_for_observations(self, observations: Optional[Sequence[Observation]] = None, *,
+                                 observations_neurons: Optional[np.ndarray] = None) \
                                                             -> Tuple[Mapping[Action, numbers.Real]]:
-        if player_states is None:
-            assert player_states_neurons is not None
-            input_array = player_states_neurons
+        if observations is None:
+            assert observations_neurons is not None
+            input_array = observations_neurons
             check_action_legality = False
         else:
-            assert player_states_neurons is None
+            assert observations_neurons is None
             input_array = np.concatenate(
-                [player_state.to_neurons()[np.newaxis, :] for player_state in player_states]
+                [observation.to_neurons()[np.newaxis, :] for observation in observations]
             )
             check_action_legality = True
         prediction_output = self.model.predict(input_array)
-        actions = self.player_state_type.action_type
+        actions = self.observation_type.action_type
         if check_action_legality:
             return tuple(
                 {action: q for action, q in dict(zip(actions, output_row)).items()
-                 if (action in player_state.legal_actions)}
-                for player_state, output_row in zip(player_states, prediction_output)
+                 if (action in observation.legal_actions)}
+                for observation, output_row in zip(observations, prediction_output)
             )
         else:
             return tuple(
@@ -197,22 +197,22 @@ class AwesomeStrategy(NiceStrategy):
 
 
 
-    def decide_action_for_player_state(self, player_state: PlayerState, *,
+    def decide_action_for_observation(self, observation: Observation, *,
                                        forced_epsilon: Optional[numbers.Real] = None,
                                        extra: Optional[np.ndarray] = None) -> Action:
         epsilon = self.epsilon if forced_epsilon is None else forced_epsilon
         if 0 < epsilon > random.random():
-            return random.choice(player_state.legal_actions)
+            return random.choice(observation.legal_actions)
         else:
-            q_map = self.get_qs_for_player_state(player_state) if extra is None else extra
+            q_map = self.get_qs_for_observation(observation) if extra is None else extra
             return max(q_map, key=q_map.__getitem__)
 
 
-    def get_player_state_v(self, player_state: PlayerState,
+    def get_observation_v(self, observation: Observation,
                            epsilon: Optional[numbers.Real] = None) -> numbers.Real:
         if epsilon is None:
             epsilon = self.epsilon
-        q_map = self.get_qs_for_player_state(player_state)
+        q_map = self.get_qs_for_observation(observation)
         return np.average(
             (
                 max(q_map.values()),
@@ -222,14 +222,14 @@ class AwesomeStrategy(NiceStrategy):
         )
 
 
-    def iterate_game(self, player_state: PlayerState) -> Iterator[ActionPlayerState]:
-        iterator = utils.iterate_windowed_pairs(Strategy.iterate_game(self, player_state))
-        yield ActionPlayerState(None, player_state)
-        for old_action_player_state, new_action_player_state in iterator:
-            self.training_data.add(old_action_player_state.player_state,
-                                   *new_action_player_state)
+    def iterate_game(self, observation: Observation) -> Iterator[ActionObservation]:
+        iterator = utils.iterate_windowed_pairs(Strategy.iterate_game(self, observation))
+        yield ActionObservation(None, observation)
+        for old_action_observation, new_action_observation in iterator:
+            self.training_data.add(old_action_observation.observation,
+                                   *new_action_observation)
             if self.training_data.is_training_time():
                 self.train()
-            yield new_action_player_state
+            yield new_action_observation
 
 

@@ -60,7 +60,7 @@ _card_distribution = tuple(range(1, 10 + 1)) + (10,) * 3
 def get_random_card() -> int:
     return random.choice(_card_distribution)
 
-class BlackjackState(gamey.PlayerState):
+class BlackjackState(gamey.Observation):
 
     reward = 0
     action_type = BlackjackAction
@@ -120,7 +120,7 @@ class BlackjackState(gamey.PlayerState):
 
 
 
-    def get_next_player_state(self, action: BlackjackAction) -> BlackjackState:
+    def get_next_observation(self, action: BlackjackAction) -> BlackjackState:
         if action not in self.legal_actions:
             raise gamey.exceptions.IllegalAction(action)
         if self.player_stuck or action == BlackjackAction.stick:
@@ -173,28 +173,28 @@ class BlackjackState(gamey.PlayerState):
 
 
 class AlwaysHitStrategy(gamey.Strategy):
-    def decide_action_for_player_state(self, player_state: BlackjackState,
+    def decide_action_for_observation(self, observation: BlackjackState,
                                        extra: Any = None) -> BlackjackAction:
         return (BlackjackAction.hit if (BlackjackAction.hit in
-                                       player_state.legal_actions)
+                                       observation.legal_actions)
                 else BlackjackAction.wait)
 
 class AlwaysStickStrategy(gamey.Strategy):
-    def decide_action_for_player_state(self, player_state: BlackjackState,
+    def decide_action_for_observation(self, observation: BlackjackState,
                                        extra: Any = None) -> BlackjackAction:
         return (BlackjackAction.stick if (BlackjackAction.stick in
-                                          player_state.legal_actions)
+                                          observation.legal_actions)
                 else BlackjackAction.wait)
 
 class ThresholdStrategy(gamey.Strategy):
     def __init__(self, threshold: int = 17) -> None:
         self.threshold = threshold
 
-    def decide_action_for_player_state(self, player_state: BlackjackState,
+    def decide_action_for_observation(self, observation: BlackjackState,
                                        extra: Any = None) -> BlackjackAction:
-        if BlackjackAction.wait in player_state.legal_actions:
+        if BlackjackAction.wait in observation.legal_actions:
             return BlackjackAction.wait
-        elif player_state.player_sum >= self.threshold:
+        elif observation.player_sum >= self.threshold:
             return BlackjackAction.stick
         else:
             return BlackjackAction.hit

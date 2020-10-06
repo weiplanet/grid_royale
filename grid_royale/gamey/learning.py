@@ -25,38 +25,38 @@ import tensorflow as tf
 import numpy as np
 
 from .strategizing import Strategy, NiceStrategy
-from .base import PlayerState, Action, StateActionReward, ActionPlayerState
+from .base import Observation, Action, StateActionReward, ActionObservation
 from . import utils
 
 
 class LearningStrategy(NiceStrategy):
-    def __init__(self, player_state_type: Type[PlayerState], curiosity: numbers.Real = 2,
+    def __init__(self, observation_type: Type[Observation], curiosity: numbers.Real = 2,
                  gamma: numbers.Real = 0.9, learning_delay: int = 10) -> None:
-        NiceStrategy.__init__(self, player_state_type=player_state_type)
+        NiceStrategy.__init__(self, observation_type=observation_type)
         self.q_map = QMap()
-        self.player_state_type = player_state_type
+        self.observation_type = observation_type
         self.curiosity = curiosity
         self.gamma = gamma
         self.learning_delay = learning_delay
 
 
-    def decide_action_for_player_state(self, player_state: PlayerState,
+    def decide_action_for_observation(self, observation: Observation,
                                        extra: Any = None) -> Action:
         action = max(
-            player_state.legal_actions,
+            observation.legal_actions,
             key=lambda action: self.q_map.get_ucb(
-                player_state, action, curiosity=self.curiosity
+                observation, action, curiosity=self.curiosity
             )
         )
         return action
 
-    def train(self, player_state: PlayerState, action: Action, q: numbers.Number) -> None:
-        self.q_map.add_sample(player_state, action, q)
+    def train(self, observation: Observation, action: Action, q: numbers.Number) -> None:
+        self.q_map.add_sample(observation, action, q)
 
-    def get_player_state_v(self, player_state: PlayerState) -> numbers.Real:
+    def get_observation_v(self, observation: Observation) -> numbers.Real:
         raise NotImplementedError
-        # return max(self.get_q_for_player_state_action(player_state, action) for action in
-                   # player_state.legal_actions)
+        # return max(self.get_q_for_observation_action(observation, action) for action in
+                   # observation.legal_actions)
 
 
 
@@ -74,15 +74,15 @@ class QMap(collections.abc.Mapping):
     __len__ = lambda self: len(self._q_values)
     __iter__ = lambda self: iter(self._q_values)
 
-    def __getitem__(self, player_state_and_action: Iterable) -> numbers.Real:
-        return self._q_values[self._to_key(*player_state_and_action)]
+    def __getitem__(self, observation_and_action: Iterable) -> numbers.Real:
+        return self._q_values[self._to_key(*observation_and_action)]
 
-    def _to_key(self, player_state: PlayerState, action: Action) -> Tuple(bytes, Action):
-        return (player_state.to_neurons().tobytes(), action)
+    def _to_key(self, observation: Observation, action: Action) -> Tuple(bytes, Action):
+        return (observation.to_neurons().tobytes(), action)
 
 
-    def add_sample(self, player_state: PlayerState, action: Action, q: numbers.Real) -> None:
-        key = self._to_key(player_state, action)
+    def add_sample(self, observation: Observation, action: Action, q: numbers.Real) -> None:
+        key = self._to_key(observation, action)
         self._q_values[key] = (
             self._q_values[key] *
             (self._n_samples[key] / (self._n_samples[key] + 1)) +
@@ -91,9 +91,9 @@ class QMap(collections.abc.Mapping):
         self._n_samples[key] += 1
         self.n_total_samples += 1
 
-    def get_ucb(self, player_state: PlayerState, action: Action,
+    def get_ucb(self, observation: Observation, action: Action,
                 curiosity: numbers.Real) -> numbers.Real:
-        key = self._to_key(player_state, action)
+        key = self._to_key(observation, action)
         return self._q_values[key] + curiosity * math.sqrt(
             utils.cute_div(
                 math.log(self.n_total_samples + 2),

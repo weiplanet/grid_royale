@@ -37,14 +37,14 @@ class _NiceDataclass(collections.abc.Sequence):
 
 @dataclasses.dataclass(order=True, frozen=True)
 class StateActionReward(_NiceDataclass):
-    player_state: PlayerState
+    observation: Observation
     action: Action
     reward: numbers.Real
 
 @dataclasses.dataclass(order=True, frozen=True)
-class ActionPlayerState(_NiceDataclass):
+class ActionObservation(_NiceDataclass):
     action: Optional[Action]
-    player_state: PlayerState
+    observation: Observation
 
 
 class _ActionType(abc.ABCMeta):# collections.abc.Sequence):
@@ -105,7 +105,7 @@ class Action(metaclass=_ActionType):
         return cls[tuple(neurons).index(1)]
 
 
-class PlayerState(abc.ABC):
+class Observation(abc.ABC):
     legal_actions: Tuple[Action, ...]
     is_end: bool
     reward: Optional[numbers.Real] = None
@@ -113,12 +113,12 @@ class PlayerState(abc.ABC):
     action_type: Type[Action]
 
     @abc.abstractmethod
-    def get_next_player_state(self, action: Action) -> PlayerState:
+    def get_next_observation(self, action: Action) -> Observation:
         raise NotImplementedError
 
     @staticmethod
     @abc.abstractmethod
-    def make_initial() -> PlayerState:
+    def make_initial() -> Observation:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -129,56 +129,56 @@ class PlayerState(abc.ABC):
 @dataclasses.dataclass(order=True, frozen=True)
 class PlayerInfo(abc.ABC):
     id: Hashable
-    player_state: PlayerState
+    observation: Observation
     strategy: strategizing.Strategy
 
 
-class WorldState(abc.ABC):
+class State(abc.ABC):
     # todo: This shouldn't be in base.py anymore
     is_end: bool
     player_infos: Mapping[Hashable, PlayerInfo]
 
-    def get_next_world_state(self) -> WorldState:
+    def get_next_state(self) -> State:
         player_id_to_action = {
-            id: player_info.strategy.decide_action_for_player_state(player_info.player_state)
-            for id, player_info in self.player_infos.items() if not player_info.player_state.is_end
+            id: player_info.strategy.decide_action_for_observation(player_info.observation)
+            for id, player_info in self.player_infos.items() if not player_info.observation.is_end
         }
-        return self.get_next_world_state_from_actions(player_id_to_action)
+        return self.get_next_state_from_actions(player_id_to_action)
 
     @abc.abstractmethod
-    def get_next_world_state_from_actions(self, player_id_to_action: Mapping[Hashable, Action]) \
-                                                                                      -> WorldState:
+    def get_next_state_from_actions(self, player_id_to_action: Mapping[Hashable, Action]) \
+                                                                                      -> State:
         raise NotImplemented
 
     @staticmethod
     @abc.abstractmethod
-    def make_initial() -> WorldState:
+    def make_initial() -> State:
         raise NotImplementedError
 
-    def iterate_world_states(self) -> Iterator[WorldState]:
-        world_state = self
-        while world_state.player_infos:
-            yield world_state
-            world_state = world_state.get_next_world_state()
+    def iterate_states(self) -> Iterator[State]:
+        state = self
+        while state.player_infos:
+            yield state
+            state = state.get_next_state()
 
 
     @classmethod
     def train(cls, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
-              max_game_length: int = 100, world_state_factory: Optional[Callable] = None) \
-                                                                            -> Iterator[WorldState]:
-        world_state_factory = ((lambda: cls.make_initial(strategies)) if world_state_factory is None
-                               else world_state_factory)
+              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
+                                                                            -> Iterator[State]:
+        state_factory = ((lambda: cls.make_initial(strategies)) if state_factory is None
+                               else state_factory)
         for i in range(n):
             print(f'Training round {i}...')
-            world_state: WorldState = world_state_factory()
-            yield from more_itertools.islice_extended(world_state.iterate_world_states())[
+            state: State = state_factory()
+            yield from more_itertools.islice_extended(state.iterate_states())[
                                                                                    :max_game_length]
         print('Done training.')
 
 
 
-class NiceWorldState(WorldState):
-    def get_next_world_state(self) -> WorldState:
+class NiceState(State):
+    def get_next_state(self) -> State:
         strategy_to_ids_and_player_infos = more_itertools.map_reduce(
             self.player_infos.items(),
             keyfunc=lambda id_and_player_info: id_and_player_info[1].strategy,
@@ -189,17 +189,17 @@ class NiceWorldState(WorldState):
         for strategy, ids_and_player_infos in strategy_to_ids_and_player_infos.items():
             strategy: strategizing.NiceStrategy
             ids, player_infos = zip(*ids_and_player_infos)
-            player_states = tuple(player_info.player_state for player_info in player_infos)
-            q_maps = strategy.get_qs_for_player_states(player_states)
+            observations = tuple(player_info.observation for player_info in player_infos)
+            q_maps = strategy.get_qs_for_observations(observations)
             player_id_to_q_map.update(zip(ids, q_maps))
 
         player_id_to_action = {
-            id: player_info.strategy.decide_action_for_player_state(
-                player_info.player_state, extra=player_id_to_q_map[id]) for id, player_info in
-            self.player_infos.items() if not player_info.player_state.is_end
+            id: player_info.strategy.decide_action_for_observation(
+                player_info.observation, extra=player_id_to_q_map[id]) for id, player_info in
+            self.player_infos.items() if not player_info.observation.is_end
         }
 
-        return self.get_next_world_state_from_actions(player_id_to_action)
+        return self.get_next_state_from_actions(player_id_to_action)
 
 
 

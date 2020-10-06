@@ -105,7 +105,7 @@ class Bullet:
 @dataclasses.dataclass(order=True, frozen=True)
 class PlayerInfo(gamey.PlayerInfo):
     id: Position
-    player_state: PlayerState
+    observation: Observation
     strategy: Strategy
 
     @property
@@ -130,7 +130,7 @@ class _BaseGrid:
 
 
 
-class WorldState(_BaseGrid, gamey.NiceWorldState):
+class State(_BaseGrid, gamey.NiceState):
 
     action_type = Action
 
@@ -146,9 +146,9 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
         self.all_bullets = frozenset(itertools.chain.from_iterable(bullets.values()))
         self.food_positions = food_positions
         self.board_size = board_size
-        self.living_player_positions = frozenset(player_info.player_state.position
+        self.living_player_positions = frozenset(player_info.observation.position
                                                  for player_info in player_infos.values()
-                                                 if not player_info.player_state.is_end)
+                                                 if not player_info.observation.is_end)
         self.is_end = not player_infos
         self.be_training = be_training
 
@@ -156,14 +156,14 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
         return (
             type(self),
             frozenset(
-                (type(dps := player_info.player_state), dps.position,
+                (type(dps := player_info.observation), dps.position,
                  dps.score, dps.reward, dps.last_action) for player_info in self.player_infos
             ),
             self.bullets, self.food_positions, self.board_size, self.is_end
         )
 
     def __eq__(self, other: Any) -> bool:
-        return isinstance(other, WorldState) and self._reduce() == other._reduce()
+        return isinstance(other, State) and self._reduce() == other._reduce()
 
     def __hash__(self) -> int:
         return hash(self._reduce())
@@ -172,11 +172,11 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
     @staticmethod
     def make_initial(universe: Universe, strategies: Tuple[Strategy], board_size: int = 24,
                      starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40,
-                     be_training: bool = True) -> WorldState:
+                     be_training: bool = True) -> State:
 
         n_players = len(strategies)
         random_positions_firehose = utils.iterate_deduplicated(
-                                     WorldState.iterate_random_positions(board_size=board_size))
+                                     State.iterate_random_positions(board_size=board_size))
         random_positions = tuple(
             more_itertools.islice_extended(
                 random_positions_firehose)[:(n_players + concurrent_food_tiles)]
@@ -191,12 +191,12 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
                       player_positions, itertools.cycle(LETTERS), strategies):
             player_infos[player_position] = PlayerInfo(
                 id=player_position,
-                player_state=PlayerState(world_state=None, position=player_position,
+                observation=Observation(state=None, position=player_position,
                                          score=starting_score, letter=letter, last_action=None),
                 strategy=strategy
             )
 
-        world_state = WorldState(
+        state = State(
             universe=universe,
             board_size=board_size,
             player_infos=immutabledict(player_infos),
@@ -205,18 +205,18 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
         )
 
         for player_info in player_infos.values():
-            player_info.player_state.world_state = world_state
+            player_info.observation.state = state
 
-        return world_state
+        return state
 
 
-    def get_next_world_state_from_actions(self,
+    def get_next_state_from_actions(self,
                                           player_id_to_action: Mapping[Position, Action]) \
-                                                                                  -> WorldState:
+                                                                                  -> State:
         new_player_position_to_olds = collections.defaultdict(set)
         for player_position, action in player_id_to_action.items():
             action: Action
-            assert action in self.player_infos[player_position].player_state.legal_actions
+            assert action in self.player_infos[player_position].observation.legal_actions
             if action.move is not None:
                 new_player_position_to_olds[player_position + action.move].add(player_position)
             else:
@@ -325,7 +325,7 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
         new_player_positions_that_ate_food = set()
         wip_food_positions = set(self.food_positions)
         random_positions_firehose = utils.iterate_deduplicated(
-            WorldState.iterate_random_positions(board_size=self.board_size),
+            State.iterate_random_positions(board_size=self.board_size),
             seen=(set(new_player_position_to_old) |
                    self.living_player_positions | self.food_positions)
         )
@@ -356,26 +356,26 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
 
             player_infos[new_player_position] = PlayerInfo(
                 id=new_player_position,
-                player_state=PlayerState(
-                    world_state=None,
+                observation=Observation(
+                    state=None,
                     position=new_player_position,
-                    score=old_player_info.player_state.score + reward,
+                    score=old_player_info.observation.score + reward,
                     reward=reward,
-                    letter=old_player_info.player_state.letter,
+                    letter=old_player_info.observation.letter,
                     last_action=player_id_to_action[old_player_info.position]
                 ),
                 strategy=old_player_info.strategy
             )
 
 
-        world_state = WorldState(
+        state = State(
             universe=self.universe, board_size=self.board_size,
             player_infos=immutabledict(player_infos), food_positions=frozenset(wip_food_positions),
             be_training=self.be_training, bullets=bullets
         )
 
         for player_info in player_infos.values():
-            player_info.player_state.world_state = world_state
+            player_info.observation.state = state
 
 
         if self.be_training:
@@ -384,16 +384,16 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
                 old_player_position = new_player_position_to_old[new_player_position]
                 old_player_info: PlayerInfo = self.player_infos[old_player_position]
                 old_player_info.strategy.training_data.add(
-                    old_player_info.player_state,
+                    old_player_info.observation,
                     player_id_to_action[old_player_position],
-                    player_info.player_state
+                    player_info.observation
                 )
                 if old_player_info.strategy.training_data.is_training_time():
                     old_player_info.strategy.train(executor=self.universe.executor)
                 assert not old_player_info.strategy.training_data.is_training_time()
 
 
-        return world_state
+        return state
 
 
 
@@ -403,9 +403,9 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
             if position.x == 0 and position.y != 0:
                 string_io.write('|\n')
             if position in self.living_player_positions:
-                player_state = self.player_infos[position].player_state
-                letter = (player_state.letter.lower() if player_state.reward < NOTHING_REWARD
-                          else player_state.letter)
+                observation = self.player_infos[position].observation
+                letter = (observation.letter.lower() if observation.reward < NOTHING_REWARD
+                          else observation.letter)
                 string_io.write(letter)
             elif (bullets := self.bullets.get(position, None)):
                 if len(bullets) >= 2:
@@ -424,9 +424,9 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
         string_io.write('\n')
 
         for player_info in sorted(self.player_infos.values(),
-                                  key=lambda player_info: player_info.player_state.letter):
+                                  key=lambda player_info: player_info.observation.letter):
             string_io.write(
-                f'{player_info.player_state.letter}: {player_info.player_state.score: <4d} '
+                f'{player_info.observation.letter}: {player_info.observation.score: <4d} '
             )
 
         return string_io.getvalue()
@@ -438,10 +438,10 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
             'players': [
                 (
                     list(player_position),
-                    (player_state := player_info.player_state).score,
-                    player_state.reward,
-                    player_state.letter,
-                    last_action.name if (last_action := player_state.last_action)
+                    (observation := player_info.observation).score,
+                    observation.reward,
+                    observation.letter,
+                    last_action.name if (last_action := observation.last_action)
                     is not None else None,
                  ) for player_position, player_info in self.player_infos.items()
             ],
@@ -471,7 +471,7 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
 
         paths = ((folder / f'{i:06d}.json') for i in range(10 ** 6))
         state_iterator = more_itertools.islice_extended(
-                                                      self.iterate_world_states())[:max_game_length]
+                                                      self.iterate_states())[:max_game_length]
         for path in paths:
             state_chunk = []
             for state in more_itertools.islice_extended(state_iterator)[:chunk]:
@@ -479,7 +479,7 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
                 state_chunk.append(state)
             if not state_chunk:
                 return
-            output = [world_state.serialized for world_state in state_chunk]
+            output = [state.serialized for state in state_chunk]
             with path.open('wb') as file:
                 json.dump(output, file)
 
@@ -499,7 +499,7 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
 
     @property
     def average_reward(self):
-        return statistics.mean(player_info.player_state.reward for player_info in
+        return statistics.mean(player_info.observation.reward for player_info in
                                self.player_infos.values())
 
 
@@ -507,15 +507,15 @@ class WorldState(_BaseGrid, gamey.NiceWorldState):
 
 
 
-class PlayerState(_BaseGrid, gamey.PlayerState):
+class Observation(_BaseGrid, gamey.Observation):
 
     action_type = Action
 
-    def __init__(self, world_state: Optional[WorldState], position: Position, *,
+    def __init__(self, state: Optional[State], position: Position, *,
                  letter: str, score: int, last_action: Optional[Action],
                  reward: int = 0) -> None:
         assert len(letter) == 1
-        self.world_state = world_state
+        self.state = state
         self.position = position
         self.letter = letter.upper()
         self.score = score
@@ -546,11 +546,11 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
 
     @property
     def board_size(self) -> int:
-        return self.world_state.board_size
+        return self.state.board_size
 
     @property
     def universe(self) -> Universe:
-        return self.world_state.universe
+        return self.state.universe
 
     n_neurons = (
         # + 1 # Score
@@ -580,12 +580,12 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
             absolute_position: Position = relative_position - translation
             if absolute_position not in self:
                 array[tuple(relative_position) + (0,)] = 1
-            elif absolute_position in self.world_state.food_positions:
+            elif absolute_position in self.state.food_positions:
                 array[tuple(relative_position) + (1,)] = 1
-            elif (bullets := self.world_state.bullets.get(absolute_position, None)):
+            elif (bullets := self.state.bullets.get(absolute_position, None)):
                 for bullet in bullets:
                     array[tuple(relative_position) + (2 + bullet.direction.index,)] = 1
-            elif (player := self.world_state.player_infos.get(absolute_position, None)):
+            elif (player := self.state.player_infos.get(absolute_position, None)):
                 player: PlayerInfo
                 array[tuple(relative_position) +
                       (6 + self.universe.core_strategies.index(player.strategy),)] = 1
@@ -623,7 +623,7 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
         field_of_view = self.position.field_of_view(vicinity, self.board_size)
 
         for distance_to_food, positions in enumerate(field_of_view, start=1):
-            if positions & self.world_state.food_positions:
+            if positions & self.state.food_positions:
                 break
         else:
             distance_to_food = float('inf')
@@ -632,7 +632,7 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
         distances_to_other_players = []
 
         for i, positions in enumerate(field_of_view, start=1):
-            if positions & self.world_state.living_player_positions:
+            if positions & self.state.living_player_positions:
                 distances_to_other_players.append(i)
                 break
         else:
@@ -642,8 +642,8 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
         for strategy in self.universe.core_strategies:
             for i, positions in enumerate(field_of_view, start=1):
                 player_infos = (
-                    self.world_state.player_infos.get(position, None) for position in
-                    positions & self.world_state.living_player_positions
+                    self.state.player_infos.get(position, None) for position in
+                    positions & self.state.living_player_positions
                 )
                 if strategy in (player_info.strategy for player_info in player_infos):
                     distances_to_other_players.append(i)
@@ -657,7 +657,7 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
         for direction in Step.all_steps:
             for i, positions in enumerate(field_of_view, start=1):
                 bullets = itertools.chain.from_iterable(
-                    self.world_state.bullets.get(position, ()) for position in positions
+                    self.state.bullets.get(position, ()) for position in positions
                 )
                 if any(bullet.direction == direction for bullet in bullets):
                     distances_to_bullets.append(i)
@@ -684,14 +684,14 @@ class PlayerState(_BaseGrid, gamey.PlayerState):
     @property
     def cute_score(self) -> int:
         return self.score - min((self.position @ food_position
-                                for food_position in self.world_state.food_positions),
+                                for food_position in self.state.food_positions),
                                 default=(-100))
 
     @staticmethod
-    def make_initial() -> PlayerState:
-        return next(iter(WorldState.make_initial().player_infos.values())).player_state
+    def make_initial() -> Observation:
+        return next(iter(State.make_initial().player_infos.values())).observation
 
-    def get_next_player_state(self, action: Action) -> PlayerState:
+    def get_next_observation(self, action: Action) -> Observation:
         raise NotImplementedError
 
     def p(self) -> None:
@@ -703,20 +703,20 @@ logging.getLogger('tensorflow').addFilter(
 
 class SimpleStrategy(gamey.Strategy):
     def __init__(self, epsilon: int = 0.2):
-        gamey.Strategy.__init__(self, player_state_type=PlayerState)
+        gamey.Strategy.__init__(self, observation_type=Observation)
         self.epsilon = epsilon
 
 
-    def decide_action_for_player_state(self, player_state: PlayerState,
+    def decide_action_for_observation(self, observation: Observation,
                                        extra: Any = None) -> Action:
-        if random.random() <= self.epsilon or not player_state.world_state.food_positions:
-            return random.choice(player_state.legal_actions)
+        if random.random() <= self.epsilon or not observation.state.food_positions:
+            return random.choice(observation.legal_actions)
         else:
             closest_food_position = min(
-                (food_position for food_position in player_state.world_state.food_positions),
-                key=lambda food_position: player_state.position @ food_position
+                (food_position for food_position in observation.state.food_positions),
+                key=lambda food_position: observation.position @ food_position
             )
-            desired_translation = closest_food_position - player_state.position
+            desired_translation = closest_food_position - observation.position
             dimension = random.choice(
                 tuple(dimension for dimension, delta in enumerate(desired_translation) if delta)
             )
@@ -730,19 +730,19 @@ class Strategy(gamey.AwesomeStrategy):
     # reward_name = 'cute_reward'
     def __init__(self, universe: Universe, **kwargs) -> None:
         self.universe = universe
-        gamey.AwesomeStrategy.__init__(self, player_state_type=PlayerState,
+        gamey.AwesomeStrategy.__init__(self, observation_type=Observation,
                                        training_batch_size=10, **kwargs)
 
     def get_aggro(self, n_states: int = 100) -> numbers.Real:
         iterator = itertools.cycle(self.universe.core_strategies)
         return self._analyze(
-            lambda player_state: player_state.reward < NOTHING_REWARD,
+            lambda observation: observation.reward < NOTHING_REWARD,
             n_states=n_states, competing_strategy_factory=lambda: next(iterator)
         )
 
     def get_munch(self, n_states: int = 100) -> numbers.Real:
         return self._analyze(
-            lambda player_state: player_state.reward == FOOD_REWARD,
+            lambda observation: observation.reward == FOOD_REWARD,
             n_states=n_states
         )
 
@@ -750,30 +750,30 @@ class Strategy(gamey.AwesomeStrategy):
     def _analyze(self, evaluate_state: Callable, n_states: int = 100,
                  n_other_players: int = 10,
                  competing_strategy_factory: Callable[[], gamey.Strategy]
-                                   = lambda: gamey.RandomStrategy(PlayerState)) -> numbers.Real:
+                                   = lambda: gamey.RandomStrategy(Observation)) -> numbers.Real:
         with utils.time():
             strategies = [self] + [competing_strategy_factory()] * n_other_players
-            n_player_states = 0
+            n_observations = 0
             score = 0
-            initial_world_states = [
-                WorldState.make_initial(self.universe, strategies,
+            initial_states = [
+                State.make_initial(self.universe, strategies,
                                             starting_score=10 ** 6, be_training=False)
                 for _ in range(3)
             ]
             iterator = more_itertools.interleave_longest(
-                *(initial_world_state.iterate_world_states() for
-                  initial_world_state in initial_world_states)
+                *(initial_state.iterate_states() for
+                  initial_state in initial_states)
             )
-            for world_state in iterator:
-                world_state: WorldState
-                (player_state,) = [
-                    player_state for player_info in world_state.player_infos.values()
-                    if (player_state := player_info.player_state).letter == LETTERS[0]
+            for state in iterator:
+                state: State
+                (observation,) = [
+                    observation for player_info in state.player_infos.values()
+                    if (observation := player_info.observation).letter == LETTERS[0]
                 ]
-                n_player_states += 1
-                score += evaluate_state(player_state)
-                if n_player_states >= n_states:
-                    return score / n_player_states
+                n_observations += 1
+                score += evaluate_state(observation)
+                if n_observations >= n_states:
+                    return score / n_observations
             else:
                 raise NotImplementedError
 
@@ -782,22 +782,22 @@ class Strategy(gamey.AwesomeStrategy):
                                                                      Tuple[Action, ...]]:
 
         def make_state(player_position: Position,
-                       food_positions: Iterable[Position]) -> WorldState:
-            player_state = PlayerState(None, player_position, letter=LETTERS[0],
+                       food_positions: Iterable[Position]) -> State:
+            observation = Observation(None, player_position, letter=LETTERS[0],
                                                 score=10 ** 6, reward=0, last_action=None)
             player_infos = immutabledict({
-                player_position: PlayerInfo(id=player_position, player_state=player_state,
+                player_position: PlayerInfo(id=player_position, observation=observation,
                                                 strategy=self,)
             })
-            world_state = WorldState(
+            state = State(
                 self.universe, board_size=24, player_infos=player_infos,
                 food_positions=frozenset(food_positions), be_training=False
             )
-            player_state.world_state = world_state
-            return world_state
+            observation.state = state
+            return state
 
         def make_states(player_position: Position,
-                        food_positions: Iterable[Position]) -> WorldState:
+                        food_positions: Iterable[Position]) -> State:
             return tuple(
                 make_state(rotated_player_position, rotated_food_positions) for
                 rotated_player_position, *rotated_food_positions in zip(
@@ -820,32 +820,32 @@ class Strategy(gamey.AwesomeStrategy):
                                 [player_position + distance * step for distance in distances])
                 )
 
-        player_states = [more_itertools.one(state.player_infos.values()).player_state
+        observations = [more_itertools.one(state.player_infos.values()).observation
                          for state in states]
 
-        def _get_cute_score_for_action(player_state: PlayerState,
+        def _get_cute_score_for_action(observation: Observation,
                                        legal_move_action: Action) -> int:
-            next_world_state = player_state.world_state. \
-                   get_next_world_state_from_actions({player_state.position: legal_move_action})
+            next_state = observation.state. \
+                   get_next_state_from_actions({observation.position: legal_move_action})
             return more_itertools.one(
-                            next_world_state.player_infos.values()).player_state.cute_score
+                            next_state.player_infos.values()).observation.cute_score
 
         return tuple((
-            np.concatenate([player_state.to_neurons()[np.newaxis, :] for
-                            player_state in player_states]),
+            np.concatenate([observation.to_neurons()[np.newaxis, :] for
+                            observation in observations]),
             tuple(
                 max(
-                    player_state.legal_move_actions,
-                    key=lambda legal_action: _get_cute_score_for_action(player_state, legal_action)
+                    observation.legal_move_actions,
+                    key=lambda legal_action: _get_cute_score_for_action(observation, legal_action)
                 )
-                for player_state in player_states
+                for observation in observations
             )
         ))
 
     def measure(self):
         neurons_of_sample_states, best_actions = \
                                                 self.get_neurons_of_sample_states_and_best_actions()
-        q_maps = self.get_qs_for_player_states(player_states_neurons=neurons_of_sample_states)
+        q_maps = self.get_qs_for_observations(observations_neurons=neurons_of_sample_states)
         decided_actions = tuple(max(q_map, key=q_map.__getitem__) for q_map in q_maps)
         return statistics.mean(decided_action == best_action for decided_action, best_action in
                                zip(decided_actions, best_actions))
@@ -867,33 +867,32 @@ class Universe:
         return BASE_COLLISION_REWARD
 
 
-    def train(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[WorldState]:
-        yield from WorldState.train(
+    def train(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
+        yield from State.train(
             self.core_strategies, n=n, max_game_length=max_game_length,
-            world_state_factory=self.make_initial
+            state_factory=self.make_initial
         )
 
-    def make_initial(self) -> WorldState:
-        return WorldState.make_initial(self, self.strategies)
+    def make_initial(self) -> State:
+        return State.make_initial(self, self.strategies)
 
 
 
 
-world_state = None
+state = None
 strategies = None
 universe = None
 
 def run():
-    global universe, world_state, strategies
+    global universe, state, strategies
     universe = Universe()
 
     # for _ in universe.train(n=2, max_game_length=100):
         # pass
-    world_state = universe.make_initial()
+    state = universe.make_initial()
     for i in range(2_000):
         # states = []
-        for state in world_state.write_to_pal(chunk=50):
-            # state: DudeWorldState
+        for state in state.write_to_pal(chunk=50):
             # states.append(state)
             # print(f'{state.average_reward:.02f}')
             print(universe.core_strategies[0].measure())
