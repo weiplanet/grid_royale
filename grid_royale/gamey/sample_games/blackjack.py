@@ -241,9 +241,11 @@ def demo():
           f"on each strategy and observe the scores:\n")
 
     def print_summary():
-        scores_and_strategies = sorted(((strategy.get_score(100), strategy) for strategy in
-                                        strategies), reverse=True)
-        for score, strategy in scores_and_strategies:
+        strategies_and_scores = sorted(
+            ((strategy, strategy.get_score(100)) for strategy in strategies),
+            key=lambda x: x[1], reverse=True
+        )
+        for strategy, score in strategies_and_scores:
             print(f'    {strategy}: '.ljust(40), end='')
             print(score)
 
@@ -254,10 +256,10 @@ def demo():
           "games on each of the two learning strategies.\n")
 
     for learning_strategy in learning_strategies:
-        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ', end='')
-        print('Done.')
         learning_strategy: gamey.Strategy
+        print(f'Training {learning_strategy} on {N_TRAINING_GAMES:,} games... ', end='')
         learning_strategy.get_score(n=N_TRAINING_GAMES)
+        print('Done.')
 
     print("\nNow let's run the old comparison again, and see what's the new score for the "
           "learning strategies:\n")
