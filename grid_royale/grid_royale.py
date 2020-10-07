@@ -35,7 +35,7 @@ from .gamey.utils import ImmutableDict
 from .vectoring import Vector, Step, Position, Translation, Vicinity
 
 SHOT_REWARD = -10
-BASE_COLLISION_REWARD = -5
+COLLISION_REWARD = -5
 FOOD_REWARD = 10
 NOTHING_REWARD = -1
 VISION_RANGE = 4
@@ -102,18 +102,6 @@ class Bullet:
 
 
 
-@dataclasses.dataclass(order=True, frozen=True)
-class PlayerInfo(): # todo: deleting this
-    id: Position
-    observation: Observation
-    strategy: Strategy
-
-    @property
-    def position(self) -> Position:
-        return self.id
-
-    # def _reduce(self):
-        # return tuple((self.id, self.score))
 
 class _BaseGrid:
     board_size: int
@@ -132,30 +120,32 @@ class _BaseGrid:
 
 class State(_BaseGrid, gamey.State):
 
-    def __init__(self, grid_royale: GridRoyale, *, board_size: int,
-                 player_infos: ImmutableDict[Position, PlayerInfo],
+    def __init__(self, grid_royale_culture: GridRoyaleCulture, *, board_size: int,
+                 letter_to_observation: ImmutableDict[str, Observation],
                  food_positions: FrozenSet[Position],
                  bullets: ImmutableDict[Position, FrozenSet[Bullet]] = ImmutableDict(),
                  be_training: bool = True) -> None:
-        self.grid_royale = grid_royale
-        self.player_infos = player_infos
+        self.grid_royale_culture = grid_royale_culture
+        self.letter_to_observation = letter_to_observation
         self.bullets = bullets
         assert all(bullets.values()) # No empty sets there.
         self.all_bullets = frozenset(itertools.chain.from_iterable(bullets.values()))
         self.food_positions = food_positions
         self.board_size = board_size
-        self.living_player_positions = frozenset(player_info.observation.position
-                                                 for player_info in player_infos.values()
-                                                 if not player_info.observation.is_end)
-        self.is_end = not player_infos
+        self.living_player_positions = ImmutableDict(
+            {observation.position: observation for observation in letter_to_observation.values()
+             if not observation.is_end}
+        )
+        self.is_end = not self.living_player_positions
         self.be_training = be_training
 
     def _reduce(self) -> tuple:
         return (
             type(self),
             frozenset(
-                (type(dps := player_info.observation), dps.position,
-                 dps.score, dps.reward, dps.last_action) for player_info in self.player_infos
+                (letter, observation.position, observation.score, observation.reward,
+                 observation.last_action) for letter, observation in
+                self.letter_to_observation.items()
             ),
             self.bullets, self.food_positions, self.board_size, self.is_end
         )
@@ -168,7 +158,7 @@ class State(_BaseGrid, gamey.State):
 
 
     @staticmethod
-    def make_initial(grid_royale: GridRoyale, strategies: Tuple[Strategy], board_size: int = 24,
+    def make_initial(grid_royale: GridRoyaleCulture, board_size: int = 24,
                      starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40,
                      be_training: bool = True) -> State:
 
@@ -184,41 +174,39 @@ class State(_BaseGrid, gamey.State):
         food_positions = frozenset(random_positions[n_players:])
         assert len(food_positions) == concurrent_food_tiles
 
-        player_infos = {}
-        for player_position, letter, strategy in zip(
-                      player_positions, itertools.cycle(LETTERS), strategies):
-            player_infos[player_position] = PlayerInfo(
-                id=player_position,
-                observation=Observation(state=None, position=player_position,
-                                         score=starting_score, letter=letter, last_action=None),
-                strategy=strategy
-            )
+        letter_to_observation = {}
+        for player_position, letter in zip(player_positions, LETTERS):
+            letter_to_observation[letter] = Observation(state=None, position=player_position,
+                                                        score=starting_score, letter=letter,
+                                                        last_action=None),
 
         state = State(
-            grid_royale=grid_royale,
+            grid_royale=grid_royale_culture,
             board_size=board_size,
-            player_infos=immutabledict(player_infos),
+            letter_to_observation=ImmutableDict(letter_to_observation),
             food_positions=food_positions,
             be_training=be_training,
         )
 
-        for player_info in player_infos.values():
-            player_info.observation.state = state
+        for observation in letter_to_observation.values():
+            observation.state = state
 
         return state
 
 
-    def get_next_state_from_actions(self,
-                                          player_id_to_action: Mapping[Position, Action]) \
+    def get_next_state_from_actions(self, player_id_to_action: Mapping[Position, Action]) \
                                                                                   -> State:
         new_player_position_to_olds = collections.defaultdict(set)
-        for player_position, action in player_id_to_action.items():
+        for letter, action in player_id_to_action.items():
             action: Action
-            assert action in self.player_infos[player_position].observation.legal_actions
+            old_observation = self.letter_to_observation[letter]
+            assert action in old_observation.legal_actions
+            old_player_position = old_observation.position
             if action.move is not None:
-                new_player_position_to_olds[player_position + action.move].add(player_position)
+                new_player_position_to_olds[old_player_position +
+                                                               action.move].add(old_player_position)
             else:
-                new_player_position_to_olds[player_position].add(player_position)
+                new_player_position_to_olds[old_player_position].add(old_player_position)
 
         ############################################################################################
         ### Figuring out which players collided into each other: ###################################
@@ -309,7 +297,7 @@ class State(_BaseGrid, gamey.State):
                 new_player_positions_that_were_shot.add(new_player_position)
 
 
-        bullets = immutabledict({
+        bullets = ImmutableDict({
             position: frozenset(bullets) for position, bullets in wip_bullets.items() if bullets
         })
 
@@ -339,57 +327,38 @@ class State(_BaseGrid, gamey.State):
         ### Finished figuring out food. ############################################################
         ############################################################################################
 
-        player_infos = {}
+        letter_to_observation = {}
 
         for new_player_position, old_player_position in new_player_position_to_old.items():
-            old_player_info: PlayerInfo = self.player_infos[old_player_position]
+            letter = self.living_player_positions[old_player_position].letter
+            old_observation: Observation = self.letter_to_observation[letter]
 
             reward = (
                 SHOT_REWARD if new_player_position in new_player_positions_that_were_shot else
-                self.grid_royale.get_collision_reward(old_player_info.strategy)
-                                            if new_player_position in collided_player_positions else
+                COLLISION_REWARD if new_player_position in collided_player_positions else
                 FOOD_REWARD if new_player_position in new_player_positions_that_ate_food else
                 NOTHING_REWARD
             )
 
-            player_infos[new_player_position] = PlayerInfo(
-                id=new_player_position,
-                observation=Observation(
-                    state=None,
-                    position=new_player_position,
-                    score=old_player_info.observation.score + reward,
-                    reward=reward,
-                    letter=old_player_info.observation.letter,
-                    last_action=player_id_to_action[old_player_info.position]
-                ),
-                strategy=old_player_info.strategy
-            )
+            letter_to_observation[letter] = Observation(
+                state=None,
+                position=new_player_position,
+                score=old_observation.score + reward,
+                reward=reward,
+                letter=letter,
+                last_action=player_id_to_action[letter]
+            ),
 
 
         state = State(
-            grid_royale=self.grid_royale, board_size=self.board_size,
-            player_infos=ImmutableDict(player_infos), food_positions=frozenset(wip_food_positions),
+            grid_royale=self.grid_royale_culture, board_size=self.board_size,
+            letter_to_observation=ImmutableDict(letter_to_observation),
+            food_positions=frozenset(wip_food_positions),
             be_training=self.be_training, bullets=bullets
         )
 
-        for player_info in player_infos.values():
-            player_info.observation.state = state
-
-
-        if self.be_training:
-            for new_player_position, player_info in player_infos.items():
-                player_info: PlayerInfo
-                old_player_position = new_player_position_to_old[new_player_position]
-                old_player_info: PlayerInfo = self.player_infos[old_player_position]
-                old_player_info.strategy.training_data.add(
-                    old_player_info.observation,
-                    player_id_to_action[old_player_position],
-                    player_info.observation
-                )
-                if old_player_info.strategy.training_data.is_training_time():
-                    old_player_info.strategy.train(executor=self.grid_royale.executor)
-                assert not old_player_info.strategy.training_data.is_training_time()
-
+        for observation in letter_to_observation.values():
+            observation.state = state
 
         return state
 
@@ -546,7 +515,7 @@ class Observation(_BaseGrid, gamey.Observation):
 
     @property
     def grid_royale(self) -> GridRoyale:
-        return self.state.grid_royale
+        return self.state.grid_royale_culture
 
     n_neurons = (
         # + 1 # Score
@@ -700,13 +669,6 @@ class GridRoyaleCulture(gamey.Culture):
         self.strategies = tuple(more_itertools.islice_extended(
                                                  itertools.cycle(self.core_strategies))[:n_players])
         self.executor = concurrent.futures.ProcessPoolExecutor(5)
-
-    def get_collision_reward(self, strategy: gamey.Strategy) -> numbers.Real:
-        # try:
-            # return (self.core_strategies.index(strategy) + 1) * BASE_COLLISION_REWARD
-        # except ValueError:
-            # return BASE_COLLISION_REWARD
-        return BASE_COLLISION_REWARD
 
 
     def grind(self, *, n: int = 10, max_length: int = 100) -> Iterator[State]:
@@ -878,21 +840,21 @@ class Strategy(_GridRoyaleStrategy):
 
 state = None
 strategies = None
-grid_royale = None
+grid_royale_culture = None
 
 def run():
-    global grid_royale, state, strategies
-    grid_royale = GridRoyale()
+    global grid_royale_culture, state, strategies
+    grid_royale_culture = GridRoyale()
 
     # for _ in grid_royale.train(n=2, max_length=100):
         # pass
-    state = grid_royale.make_initial()
+    state = grid_royale_culture.make_initial()
     for i in range(2_000):
         # states = []
         for state in state.write_to_pal(chunk=50):
             # states.append(state)
             # print(f'{state.average_reward:.02f}')
-            print(grid_royale.core_strategies[0].measure())
+            print(grid_royale_culture.core_strategies[0].measure())
 
 
 
