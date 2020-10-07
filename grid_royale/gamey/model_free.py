@@ -126,7 +126,7 @@ class ModelFreeLearningStrategy(QStrategy):
 
         if self.training_data.is_training_time():
 
-            n_actions = len(self.Game.Action)
+            n_actions = len(self.State.Action)
             slicer = ((lambda x: x) if self.training_data.filled_max_size else
                       (lambda x: x[:self.training_data.counter_modulo]))
             old_observation_neurons = slicer(self.training_data.old_observation_neuron_array)
