@@ -16,13 +16,15 @@ import enum
 import functools
 import numbers
 from typing import (Iterable, Union, Optional, Tuple, Any, Iterator, Type,
-                    Sequence, Callable, Hashable, Mapping)
+                    Sequence, Callable, Hashable, Mapping, TypeVar)
 import dataclasses
 
 import more_itertools
 import keras.models
 import tensorflow as tf
 import numpy as np
+
+from .utils import ImmutableDict
 
 
 
@@ -110,13 +112,16 @@ class Observation(abc.ABC):
     def to_neurons(self) -> np.ndarray:
         raise NotImplementedError
 
-
+PlayerId = TypeVar('PlayerId', Hashable)
 
 class State(abc.ABC):
+    Observation: Type[Observation]
+    Action: Type[Action]
     is_end: bool
+    player_id_to_observation: ImmutableDict[PlayerId, Observation]
 
     @abc.abstractmethod
-    def get_next_state(self) -> State:
+    def get_next_state_from_actions(self, player_id_to_action: Mapping[PlayerId, Action]) -> State:
         raise NotImplementedError
 
     @staticmethod
@@ -130,7 +135,6 @@ class State(abc.ABC):
         while not state.is_end:
             state = state.get_next_state()
             yield state
-
 
 
 class SinglePlayerState(State, Observation):
@@ -171,13 +175,11 @@ class MultiPlayerState(State):
 
 class Game:
     State: Type[State]
-    Observation: Type[Observation]
-    Action: Type[Action]
 
-    def __init__(self):
-        assert issubclass(self.State, State)
-        assert issubclass(self.Observation, Observation)
-        assert issubclass(self.Action, Action)
+    # def __init__(self):
+        # assert issubclass(self.State, State)
+        # assert issubclass(self.Observation, Observation)
+        # assert issubclass(self.Action, Action)
 
 
     def grind(self, strategies: Tuple[strategizing.Strategy], *, n: int = 10,

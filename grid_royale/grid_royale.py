@@ -28,10 +28,10 @@ import datetime as datetime_module
 import numpy as np
 import scipy.special
 import more_itertools
-from immutabledict import immutabledict
 
 from . import gamey
 from . import utils
+from .gamey.utils import ImmutableDict
 from .vectoring import Vector, Step, Position, Translation, Vicinity
 
 SHOT_REWARD = -10
@@ -133,9 +133,9 @@ class _BaseGrid:
 class State(_BaseGrid, gamey.MultiPlayerState):
 
     def __init__(self, grid_royale: GridRoyale, *, board_size: int,
-                 player_infos: immutabledict[Position, PlayerInfo],
+                 player_infos: ImmutableDict[Position, PlayerInfo],
                  food_positions: FrozenSet[Position],
-                 bullets: immutabledict[Position, FrozenSet[Bullet]] = immutabledict(),
+                 bullets: ImmutableDict[Position, FrozenSet[Bullet]] = ImmutableDict(),
                  be_training: bool = True) -> None:
         self.grid_royale = grid_royale
         self.player_infos = player_infos
@@ -368,7 +368,7 @@ class State(_BaseGrid, gamey.MultiPlayerState):
 
         state = State(
             grid_royale=self.grid_royale, board_size=self.board_size,
-            player_infos=immutabledict(player_infos), food_positions=frozenset(wip_food_positions),
+            player_infos=ImmutableDict(player_infos), food_positions=frozenset(wip_food_positions),
             be_training=self.be_training, bullets=bullets
         )
 
@@ -805,7 +805,7 @@ class Strategy(_GridRoyaleStrategy):
                        food_positions: Iterable[Position]) -> State:
             observation = Observation(None, player_position, letter=LETTERS[0],
                                                 score=10 ** 6, reward=0, last_action=None)
-            player_infos = immutabledict({
+            player_infos = ImmutableDict({
                 player_position: PlayerInfo(id=player_position, observation=observation,
                                                 strategy=self,)
             })

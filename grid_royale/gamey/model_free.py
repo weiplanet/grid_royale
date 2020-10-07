@@ -39,13 +39,13 @@ class TrainingData:
         self.counter = 0
         self._last_trained_batch = 0
         self.old_observation_neuron_array = np.zeros(
-            (max_size, model_free_learning_strategy.Game.Observation.n_neurons)
+            (max_size, model_free_learning_strategy.State.Observation.n_neurons)
         )
         self.new_observation_neuron_array = np.zeros(
-            (max_size, model_free_learning_strategy.Game.Observation.n_neurons)
+            (max_size, model_free_learning_strategy.State.Observation.n_neurons)
         )
         self.action_neuron_array = np.zeros(
-            (max_size,model_free_learning_strategy.Game.Action.n_neurons)
+            (max_size, model_free_learning_strategy.State.Action.n_neurons)
         )
         self.reward_array = np.zeros(max_size)
         self.are_not_end_array = np.zeros(max_size)

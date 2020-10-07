@@ -5,6 +5,8 @@ from typing import Optional, Union, Tuple, Iterable, Iterator
 import numbers
 
 import more_itertools
+from immutabledict import immutabledict as ImmutableDict
+
 
 class LastDetectingIterator(more_itertools.peekable):
     def on_last_item(self):

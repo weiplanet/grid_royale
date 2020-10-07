@@ -31,12 +31,13 @@ class Strategy(abc.ABC):
 
     gamma: numbers.Real = 1
     reward_name: str = 'reward'
-    Game: Type[Game]
+    State: Type[State]
 
     def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
                   forced_gamma: Optional[numbers.Real] = None,
                   max_game_length: Optional[int] = None) -> int:
-        make_observation = (self.Game.Observation.make_initial if observation_factory is None
+        1 / 0
+        make_observation = (self.State.Observation.make_initial if observation_factory is None
                       else observation_factory)
         gamma = self.gamma if not forced_gamma else forced_gamma
         return sum(
