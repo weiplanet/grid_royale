@@ -110,7 +110,6 @@ class Observation(abc.ABC):
     is_end: bool
     reward: Optional[numbers.Real] = None
     n_neurons: int
-    action_type: Type[Action]
 
     @abc.abstractmethod
     def get_next_observation(self, action: Action) -> Observation:
