@@ -170,7 +170,7 @@ class State(gamey.SinglePlayerState):
 
 
 
-class Blackjack(gamey.Game):
+class Blackjack(gamey.SinglePlayerGame):
     State = State
     Action = Action
 
