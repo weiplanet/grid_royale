@@ -52,7 +52,7 @@ class SinglePlayerStrategy(Strategy):
     def get_score(self, n: int = 1_000, state_factory: Optional[Callable] = None,
                   max_length: Optional[int] = None) -> int:
 
-        single_player_culture = SinglePlayerCulture(self)
+        single_player_culture = SinglePlayerCulture(self.State, strategy=self)
         return sum(
             single_player_state.reward for single_player_state in single_player_culture.
                          iterate_many_games(n=n, max_length=max_length, state_factory=state_factory)

@@ -151,8 +151,11 @@ class SinglePlayerState(State, Observation, metaclass=_SinglePlayerStateType):
 
 
 class Culture:
-    State: Type[State]
-    player_id_to_strategy: Mapping[PlayerId, strategizing.Strategy]
+    def __init__(self, state_type: Type[State],
+                 player_id_to_strategy: Mapping[PlayerId, strategizing.Strategy]) -> None:
+        self.State = state_type
+        self.player_id_to_strategy = player_id_to_strategy
+
 
     def iterate_many_games(self, *, n: int = 10, max_length: int = 100,
                            state_factory: Optional[Callable] = None) -> Iterator[State]:
@@ -190,8 +193,12 @@ class SinglePlayerCulture(Culture):
 
     player_id_to_strategy = property(lambda self: collections.defaultdict(lambda: self.strategy))
 
-    def __init__(self, strategy: strategizing.Strategy) -> None:
+    def __init__(self, state_type: Type[SinglePlayerState], *,
+                 strategy: strategizing.Strategy) -> None:
         self.strategy = strategy
+        Culture.__init__(self, state_type=state_type,
+                         player_id_to_strategy=ImmutableDict({None: strategy}))
+
 
 
 
