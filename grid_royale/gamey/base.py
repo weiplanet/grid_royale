@@ -153,60 +153,29 @@ class Culture:
         for i in range(n):
             print(f'Training round {i}...')
             state: State = state_factory()
-            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
+            yield from more_itertools.islice_extended(self.iterate_states(state))[:max_game_length]
         print('Done training.')
 
 
-    def iterate_states(self) -> Iterator[State]:
-        state = self
+    def iterate_states(self, state: State) -> Iterator[State]:
         yield state
         while not state.is_end:
-            state = state.get_next_state()
+            state = self.get_next_state(state)
             yield state
 
     def get_next_state(self, state: State) -> State:
-        strategy_to_ids_and_player_infos = more_itertools.map_reduce(
-            self.player_infos.items(),
-            keyfunc=lambda id_and_player_info: id_and_player_info[1].strategy,
-            reducefunc=tuple
-        )
-
-        player_id_to_q_map = {}
-        for strategy, ids_and_player_infos in strategy_to_ids_and_player_infos.items():
-            strategy: strategizing.QStrategy
-            ids, player_infos = zip(*ids_and_player_infos)
-            observations = tuple(player_info.observation for player_info in player_infos)
-            q_maps = strategy.get_qs_for_observations(observations)
-            player_id_to_q_map.update(zip(ids, q_maps))
-
         player_id_to_action = {
-            id: player_info.strategy.decide_action_for_observation(
-                player_info.observation, extra=player_id_to_q_map[id]) for id, player_info in
-            self.player_infos.items() if not player_info.observation.is_end
+            player_id: self.player_id_to_strategy[player_id] for player_id, observation in
+            state.player_id_to_observation.items()
         }
 
-        return self.get_next_state_from_actions(player_id_to_action)
+        return state.get_next_state_from_actions(player_id_to_action)
 
 
-
-
-class _SinglePlayerGameType(type):
-    Observation = property(lambda cls: cls.State)
-
-
-class SinglePlayerGame(Game, metaclass=_SinglePlayerGameType):
+class SinglePlayerCulture(Culture):
     strategy: strategizing.Strategy
-    state = property(lambda self: self)
+    player_id_to_strategy = property(lambda self: collections.defaultdict(lambda: self.strategy))
 
-    def get_next_state(self) -> State:
-        return self.get_next_state_from_action(self.strategy.decide_action_for_observation(self))
-
-    @abc.abstractmethod
-    def get_next_state_from_action(self, action: Action) -> State:
-        raise NotImplementedError
-
-class MultiPlayerGame(Game):
-    pass
 
 
 
