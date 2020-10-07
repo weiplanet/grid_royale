@@ -135,6 +135,42 @@ class PlayerInfo(abc.ABC):
 class State(abc.ABC):
     # todo: This shouldn't be in base.py anymore
     is_end: bool
+
+    @abc.abstractmethod
+    def get_next_state(self) -> State:
+        raise NotImplementedError
+
+    @staticmethod
+    @abc.abstractmethod
+    def make_initial() -> State:
+        raise NotImplementedError
+
+    def iterate_states(self) -> Iterator[State]:
+        state = self
+        yield state
+        while not state.is_end:
+            state = state.get_next_state()
+            yield state
+
+
+    @classmethod
+    def grind(cls, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
+              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
+                                                                                 -> Iterator[State]:
+        state_factory = ((lambda: cls.make_initial(strategies)) if state_factory is None
+                               else state_factory)
+        for i in range(n):
+            print(f'Training round {i}...')
+            state: State = state_factory()
+            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
+        print('Done training.')
+
+
+class SinglePlayerState(State, Observation):
+    pass
+
+
+class MultiPlayerState(State):
     player_infos: Mapping[Hashable, PlayerInfo]
 
     def get_next_state(self) -> State:
@@ -149,34 +185,6 @@ class State(abc.ABC):
                                                                                       -> State:
         raise NotImplemented
 
-    @staticmethod
-    @abc.abstractmethod
-    def make_initial() -> State:
-        raise NotImplementedError
-
-    def iterate_states(self) -> Iterator[State]:
-        state = self
-        while state.player_infos:
-            yield state
-            state = state.get_next_state()
-
-
-    @classmethod
-    def train(cls, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
-              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
-                                                                            -> Iterator[State]:
-        state_factory = ((lambda: cls.make_initial(strategies)) if state_factory is None
-                               else state_factory)
-        for i in range(n):
-            print(f'Training round {i}...')
-            state: State = state_factory()
-            yield from more_itertools.islice_extended(state.iterate_states())[
-                                                                                   :max_game_length]
-        print('Done training.')
-
-
-
-class NiceState(State):
     def get_next_state(self) -> State:
         strategy_to_ids_and_player_infos = more_itertools.map_reduce(
             self.player_infos.items(),
@@ -212,6 +220,14 @@ class Game:
         assert issubclass(self.Action, Action)
 
 
+class _SinglePlayerGameType(type):
+    Observation = property(lambda cls: cls.State)
+
+class SinglePlayerGame(Game, metaclass=_SinglePlayerGameType):
+    pass
+
+class MultiPlayerGame(Game):
+    pass
 
 
 

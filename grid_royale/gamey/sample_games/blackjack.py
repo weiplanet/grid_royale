@@ -61,7 +61,7 @@ _card_distribution = tuple(range(1, 10 + 1)) + (10,) * 3
 def get_random_card() -> int:
     return random.choice(_card_distribution)
 
-class State(gamey.State, gamey.Observation):
+class State(gamey.SinglePlayerState):
 
     reward = 0
 

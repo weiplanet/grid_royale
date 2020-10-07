@@ -130,7 +130,7 @@ class _BaseGrid:
 
 
 
-class State(_BaseGrid, gamey.NiceState):
+class State(_BaseGrid, gamey.MultiPlayerState):
 
     def __init__(self, grid_royale: GridRoyale, *, board_size: int,
                  player_infos: immutabledict[Position, PlayerInfo],
@@ -716,8 +716,8 @@ class GridRoyale(gamey.Game):
         return BASE_COLLISION_REWARD
 
 
-    def train(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
-        yield from State.train(
+    def grind(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
+        yield from State.grind(
             self.core_strategies, n=n, max_game_length=max_game_length,
             state_factory=self.make_initial
         )
