@@ -1,1 +1,1 @@
-from .grid_royale_culture import *
+from .grid_royale import *

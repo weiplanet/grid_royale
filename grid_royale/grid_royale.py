@@ -370,7 +370,7 @@ class State(_BaseGrid, gamey.State):
             if position.x == 0 and position.y != 0:
                 string_io.write('|\n')
             if position in self.living_player_positions:
-                observation = self.player_infos[position].observation
+                observation = self.living_player_positions[position]
                 letter = (observation.letter.lower() if observation.reward < NOTHING_REWARD
                           else observation.letter)
                 string_io.write(letter)
@@ -389,12 +389,6 @@ class State(_BaseGrid, gamey.State):
         string_io.write('|\n')
         string_io.write('‾' * self.board_size)
         string_io.write('\n')
-
-        for player_info in sorted(self.player_infos.values(),
-                                  key=lambda player_info: player_info.observation.letter):
-            string_io.write(
-                f'{player_info.observation.letter}: {player_info.observation.score: <4d} '
-            )
 
         return string_io.getvalue()
 
