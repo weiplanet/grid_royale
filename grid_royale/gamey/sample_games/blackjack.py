@@ -217,7 +217,7 @@ class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrate
 
 
 
-def demo(n_training_games: int = 1_000) -> None:
+def demo(n_training_games: int = 10_000) -> None:
     print('Starting Blackjack demo.')
 
     # model_free_learning_strategy.get_score(n=1_000)
