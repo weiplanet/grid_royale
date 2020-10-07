@@ -170,15 +170,8 @@ class State(gamey.SinglePlayerState):
 
 
 
-class Blackjack(gamey.SinglePlayerGame):
-    State = State
-    Action = Action
-
-
-
-
 class BlackjackStrategy(gamey.Strategy):
-    Game = Blackjack
+    State = State
 
 
 class AlwaysHitStrategy(BlackjackStrategy):

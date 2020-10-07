@@ -36,7 +36,7 @@ class Strategy(abc.ABC):
     def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
                   forced_gamma: Optional[numbers.Real] = None,
                   max_game_length: Optional[int] = None) -> int:
-        1 / 0
+
         make_observation = (self.State.Observation.make_initial if observation_factory is None
                       else observation_factory)
         gamma = self.gamma if not forced_gamma else forced_gamma
