@@ -178,8 +178,10 @@ class Culture:
 
     def get_next_state(self, state: State) -> State:
         player_id_to_action = {
-            player_id: self.player_id_to_strategy[player_id] for player_id, observation in
-            state.player_id_to_observation.items() if not observation.is_end
+            player_id: self.player_id_to_strategy[player_id
+                                                        ].decide_action_for_observation(observation)
+            for player_id, observation in state.player_id_to_observation.items()
+            if not observation.is_end
         }
         next_state = state.get_next_state_from_actions(player_id_to_action)
         for player_id, action in player_id_to_action.items():
