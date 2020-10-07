@@ -63,6 +63,8 @@ def get_random_card() -> int:
 
 class BlackjackState(gamey.SinglePlayerState):
 
+    Action = BlackjackAction
+
     reward = 0
 
     def __init__(self, player_cards: Tuple[int, ...], dealer_cards: Tuple[int, ...]) -> None:
@@ -170,7 +172,7 @@ class BlackjackState(gamey.SinglePlayerState):
 
 
 
-class BlackjackStrategy(gamey.Strategy):
+class BlackjackStrategy(gamey.SinglePlayerStrategy):
     State = BlackjackState
 
 
