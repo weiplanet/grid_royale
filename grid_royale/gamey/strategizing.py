@@ -60,14 +60,14 @@ class Strategy(abc.ABC):
 
 class SinglePlayerStrategy(Strategy):
 
-    def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
+    def get_score(self, n: int = 1_000, state_factory: Optional[Callable] = None,
                   gamma: Optional[numbers.Real] = None,
                   max_length: Optional[int] = None) -> int:
 
         single_player_culture = SinglePlayerCulture(self)
-        single_player_culture
-        make_observation = (self.State.make_initial() if observation_factory is None
-                      else observation_factory)
+        single_player_culture.iterate_many_games(n=n, max_length=max_length,
+                                                 state_factory=state_factory)
+        make_state = (self.State.make_initial() if state_factory is None else state_factory)
         gamma_ = self.gamma if gamma is None else gamma
         return sum(
             sum(
@@ -75,7 +75,7 @@ class SinglePlayerStrategy(Strategy):
                 for i, action_observation in
                 enumerate(
                     more_itertools.islice_extended(
-                        self.iterate_game(make_observation())
+                        self.iterate_game(make_state())
                     )[:max_length]
                 )
             )
