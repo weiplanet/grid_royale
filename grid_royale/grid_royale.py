@@ -398,13 +398,13 @@ class State(_BaseGrid, gamey.State):
         return {
             'players': [
                 (
-                    list(player_position),
-                    (observation := player_info.observation).score,
+                    list(observation.position),
+                    observation.score,
                     observation.reward,
                     observation.letter,
-                    last_action.name if (last_action := observation.last_action)
-                    is not None else None,
-                 ) for player_position, player_info in self.player_infos.items()
+                    last_action.name if (last_action := observation.last_action) is not None
+                    else None,
+                 ) for letter, observation in self.letter_to_observation.items()
             ],
             'food_positions': list(map(list, self.food_positions)),
             'bullets': [
@@ -460,8 +460,8 @@ class State(_BaseGrid, gamey.State):
 
     @property
     def average_reward(self):
-        return statistics.mean(player_info.observation.reward for player_info in
-                               self.player_infos.values())
+        return statistics.mean(observation.reward for observation in
+                               self.letter_to_observation.values())
 
 
 
@@ -508,7 +508,7 @@ class Observation(_BaseGrid, gamey.Observation):
         return self.state.board_size
 
     @property
-    def grid_royale(self) -> GridRoyale:
+    def grid_royale_culture(self) -> GridRoyaleCulture:
         return self.state.grid_royale_culture
 
     n_neurons = (
@@ -544,10 +544,9 @@ class Observation(_BaseGrid, gamey.Observation):
             elif (bullets := self.state.bullets.get(absolute_position, None)):
                 for bullet in bullets:
                     array[tuple(relative_position) + (2 + bullet.direction.index,)] = 1
-            elif (player := self.state.player_infos.get(absolute_position, None)):
-                player: PlayerInfo
+            elif (observation := self.state.living_player_positions.get(absolute_position, None)):
                 array[tuple(relative_position) +
-                      (6 + self.grid_royale.core_strategies.index(player.strategy),)] = 1
+                      (6 + self.grid_royale_culture.core_strategies.index(player.strategy),)] = 1
 
         return array
 
@@ -654,15 +653,14 @@ logging.getLogger('tensorflow').addFilter(
 )
 
 class GridRoyaleCulture(gamey.Culture):
-    State = State
-    Observation = Observation
-    Action = Action
 
     def __init__(self, n_players: int = 20):
         self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
         self.strategies = tuple(more_itertools.islice_extended(
                                                  itertools.cycle(self.core_strategies))[:n_players])
         self.executor = concurrent.futures.ProcessPoolExecutor(5)
+        gamey.Culture.__init__(state_type=State,
+                               player_id_to_strategy=dict(zip(LETTERS, strategies)))
 
 
     def grind(self, *, n: int = 10, max_length: int = 100) -> Iterator[State]:
