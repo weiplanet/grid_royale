@@ -29,7 +29,6 @@ from . import utils
 
 class Strategy(abc.ABC):
 
-    gamma: numbers.Real = 1
     State: Type[State]
 
     @abc.abstractmethod
@@ -62,17 +61,17 @@ class Strategy(abc.ABC):
 class SinglePlayerStrategy(Strategy):
 
     def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
-                  forced_gamma: Optional[numbers.Real] = None,
+                  gamma: Optional[numbers.Real] = None,
                   max_length: Optional[int] = None) -> int:
 
         single_player_culture = SinglePlayerCulture(self)
         single_player_culture
         make_observation = (self.State.make_initial() if observation_factory is None
                       else observation_factory)
-        gamma = self.gamma if not forced_gamma else forced_gamma
+        gamma_ = self.gamma if gamma is None else gamma
         return sum(
             sum(
-                (gamma ** i) * action_observation.observation.reward
+                (gamma_ ** i) * action_observation.observation.reward
                 for i, action_observation in
                 enumerate(
                     more_itertools.islice_extended(

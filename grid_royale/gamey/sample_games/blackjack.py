@@ -49,19 +49,19 @@ class _BlackjackActionType(type(gamey.Action), type(enum.Enum)):
     pass
 
 
-class Action(gamey.Action, enum.Enum, metaclass=_BlackjackActionType):
+class BlackjackAction(gamey.Action, enum.Enum, metaclass=_BlackjackActionType):
     hit = 'hit'
     stick = 'stick'
     wait = 'wait'
 
-Action.all_actions = (Action.hit, Action.stick,
-                               Action.wait)
+BlackjackAction.all_actions = (BlackjackAction.hit, BlackjackAction.stick,
+                               BlackjackAction.wait)
 
 _card_distribution = tuple(range(1, 10 + 1)) + (10,) * 3
 def get_random_card() -> int:
     return random.choice(_card_distribution)
 
-class State(gamey.SinglePlayerState):
+class BlackjackState(gamey.SinglePlayerState):
 
     reward = 0
 
@@ -113,29 +113,29 @@ class State(gamey.SinglePlayerState):
         if self.is_end:
             self.legal_actions = ()
         elif self.player_stuck:
-            self.legal_actions = (Action.wait,)
+            self.legal_actions = (BlackjackAction.wait,)
         else:
-            self.legal_actions = (Action.hit, Action.stick,)
+            self.legal_actions = (BlackjackAction.hit, BlackjackAction.stick,)
 
 
 
-    def get_next_state_from_action(self, action: Action) -> State:
+    def get_next_state_from_action(self, action: BlackjackAction) -> BlackjackState:
         if action not in self.legal_actions:
             raise gamey.exceptions.IllegalAction(action)
-        if self.player_stuck or action == Action.stick:
-            return State(
+        if self.player_stuck or action == BlackjackAction.stick:
+            return BlackjackState(
                 self.player_cards,
                 self.dealer_cards + (get_random_card(),)
             )
         else:
-            return State(
+            return BlackjackState(
                 self.player_cards + (get_random_card(),),
                 self.dealer_cards
             )
 
     @staticmethod
-    def make_initial() -> State:
-        return State(
+    def make_initial() -> BlackjackState:
+        return BlackjackState(
             (get_random_card(), get_random_card()),
             (get_random_card(),)
         )
@@ -175,29 +175,29 @@ class BlackjackStrategy(gamey.Strategy):
 
 
 class AlwaysHitStrategy(BlackjackStrategy):
-    def decide_action_for_observation(self, observation: State,
-                                       extra: Any = None) -> Action:
-        return (Action.hit if (Action.hit in observation.legal_actions)
-                else Action.wait)
+    def decide_action_for_observation(self, observation: BlackjackState,
+                                       extra: Any = None) -> BlackjackAction:
+        return (BlackjackAction.hit if (BlackjackAction.hit in observation.legal_actions)
+                else BlackjackAction.wait)
 
 class AlwaysStickStrategy(BlackjackStrategy):
-    def decide_action_for_observation(self, observation: State,
-                                       extra: Any = None) -> Action:
-        return (Action.stick if (Action.stick in observation.legal_actions)
-                else Action.wait)
+    def decide_action_for_observation(self, observation: BlackjackState,
+                                       extra: Any = None) -> BlackjackAction:
+        return (BlackjackAction.stick if (BlackjackAction.stick in observation.legal_actions)
+                else BlackjackAction.wait)
 
 class ThresholdStrategy(BlackjackStrategy):
     def __init__(self, threshold: int = 17) -> None:
         self.threshold = threshold
 
-    def decide_action_for_observation(self, observation: State,
-                                       extra: Any = None) -> Action:
-        if Action.wait in observation.legal_actions:
-            return Action.wait
+    def decide_action_for_observation(self, observation: BlackjackState,
+                                       extra: Any = None) -> BlackjackAction:
+        if BlackjackAction.wait in observation.legal_actions:
+            return BlackjackAction.wait
         elif observation.player_sum >= self.threshold:
-            return Action.stick
+            return BlackjackAction.stick
         else:
-            return Action.hit
+            return BlackjackAction.hit
 
     def _extra_repr(self):
         return f'(threshold={self.threshold})'
