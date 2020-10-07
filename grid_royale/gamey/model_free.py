@@ -50,13 +50,12 @@ class TrainingData:
         self.reward_array = np.zeros(max_size)
         self.are_not_end_array = np.zeros(max_size)
 
-    def add(self, old_observation: Observation, action: Action,
-            new_observation: Observation) -> None:
-        self.old_observation_neuron_array[self.counter_modulo] = old_observation.to_neurons()
+    def add(self, observation: Observation, action: Action, next_observation: Observation) -> None:
+        self.old_observation_neuron_array[self.counter_modulo] = observation.to_neurons()
         self.action_neuron_array[self.counter_modulo] = action.to_neurons()
-        self.new_observation_neuron_array[self.counter_modulo] = new_observation.to_neurons()
-        self.reward_array[self.counter_modulo] = new_observation.reward
-        self.are_not_end_array[self.counter_modulo] = int(not new_observation.is_end)
+        self.new_observation_neuron_array[self.counter_modulo] = next_observation.to_neurons()
+        self.reward_array[self.counter_modulo] = next_observation.reward
+        self.are_not_end_array[self.counter_modulo] = int(not next_observation.is_end)
         self.counter += 1
 
 
@@ -120,52 +119,58 @@ class ModelFreeLearningStrategy(QStrategy):
 
 
 
-    def train(self, executor: Optional[concurrent.futures.Executor] = None) -> None:
-        n_actions = len(self.Game.Action)
-        slicer = ((lambda x: x) if self.training_data.filled_max_size else
-                  (lambda x: x[:self.training_data.counter_modulo]))
-        old_observation_neurons = slicer(self.training_data.old_observation_neuron_array)
-        new_observation_neurons = slicer(self.training_data.new_observation_neuron_array)
-        action_neurons = slicer(self.training_data.action_neuron_array)
-        are_not_ends = slicer(self.training_data.are_not_end_array)
-        rewards = slicer(self.training_data.reward_array)
-        n_data_points = old_observation_neurons.shape[0]
+    def train(self, observation: Observation, action: Action,
+              next_observation: Observation) -> None:
 
-        if self._fit_future is not None:
-            weights = self._fit_future.result()
-            self.model.set_weights(weights)
-            self._fit_future = None
+        self.training_data.add(observation, action, next_observation)
 
-        old_fuck, new_fuck = np.split(
-            self.model.predict(
-                np.concatenate((old_observation_neurons, new_observation_neurons))
-            ),
-            2
-        )
+        if self.training_data.is_training_time():
 
-        # Assumes discrete actions:
-        action_indices = np.dot(action_neurons, range(n_actions)).astype(np.int32)
+            n_actions = len(self.Game.Action)
+            slicer = ((lambda x: x) if self.training_data.filled_max_size else
+                      (lambda x: x[:self.training_data.counter_modulo]))
+            old_observation_neurons = slicer(self.training_data.old_observation_neuron_array)
+            new_observation_neurons = slicer(self.training_data.new_observation_neuron_array)
+            action_neurons = slicer(self.training_data.action_neuron_array)
+            are_not_ends = slicer(self.training_data.are_not_end_array)
+            rewards = slicer(self.training_data.reward_array)
+            n_data_points = old_observation_neurons.shape[0]
 
-        batch_index = np.arange(n_data_points, dtype=np.int32)
-        old_fuck[batch_index, action_indices] = (
-            rewards + self.gamma * np.max(new_fuck, axis=1) * are_not_ends
-        )
+            if self._fit_future is not None:
+                weights = self._fit_future.result()
+                self.model.set_weights(weights)
+                self._fit_future = None
 
-        fit_arguments = {
-            'x': old_observation_neurons,
-            'y': old_fuck,
-            'epochs': max(1, int(self.n_epochs *
-                                 (n_data_points / self.training_data.max_size))),
-            'verbose': 0,
-        }
+            old_fuck, new_fuck = np.split(
+                self.model.predict(
+                    np.concatenate((old_observation_neurons, new_observation_neurons))
+                ),
+                2
+            )
 
-        # This seems not to work fast:
-        # if executor is not None:
-            # self._fit_future = executor.submit(_fit_external, self.model, **fit_arguments)
-        # else:
-        self.model.fit(**fit_arguments)
+            # Assumes discrete actions:
+            action_indices = np.dot(action_neurons, range(n_actions)).astype(np.int32)
 
-        self.training_data.mark_trained()
+            batch_index = np.arange(n_data_points, dtype=np.int32)
+            old_fuck[batch_index, action_indices] = (
+                rewards + self.gamma * np.max(new_fuck, axis=1) * are_not_ends
+            )
+
+            fit_arguments = {
+                'x': old_observation_neurons,
+                'y': old_fuck,
+                'epochs': max(1, int(self.n_epochs *
+                                     (n_data_points / self.training_data.max_size))),
+                'verbose': 0,
+            }
+
+            # This seems not to work fast:
+            # if executor is not None:
+                # self._fit_future = executor.submit(_fit_external, self.model, **fit_arguments)
+            # else:
+            self.model.fit(**fit_arguments)
+
+            self.training_data.mark_trained()
 
 
     def get_qs_for_observations(self, observations: Optional[Sequence[Observation]] = None, *,
@@ -221,15 +226,5 @@ class ModelFreeLearningStrategy(QStrategy):
             weights=(1 - epsilon, epsilon)
         )
 
-
-    def iterate_game(self, observation: Observation) -> Iterator[ActionObservation]:
-        iterator = utils.iterate_windowed_pairs(Strategy.iterate_game(self, observation))
-        yield ActionObservation(None, observation)
-        for old_action_observation, new_action_observation in iterator:
-            self.training_data.add(old_action_observation.observation,
-                                   *new_action_observation)
-            if self.training_data.is_training_time():
-                self.train()
-            yield new_action_observation
 
 
