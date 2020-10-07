@@ -75,6 +75,11 @@ class Strategy(abc.ABC):
     def _extra_repr(self) -> str:
         return ('(?)' if inspect.signature(self.__init__).parameters else '()')
 
+    def train(self, observation: Observation, action: Action,
+              next_observation: Observation) -> None:
+        pass # Put your training logic here, if you wish.
+
+
 
 class RandomStrategy(Strategy):
     def decide_action_for_observation(self, observation: Observation, *,

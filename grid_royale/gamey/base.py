@@ -166,10 +166,14 @@ class Culture:
     def get_next_state(self, state: State) -> State:
         player_id_to_action = {
             player_id: self.player_id_to_strategy[player_id] for player_id, observation in
-            state.player_id_to_observation.items()
+            state.player_id_to_observation.items() if not observation.is_end
         }
-
-        return state.get_next_state_from_actions(player_id_to_action)
+        next_state = state.get_next_state_from_actions(player_id_to_action)
+        for player_id, action in player_id_to_action.items():
+            strategy = self.player_id_to_strategy[player_id]
+            observation = state.player_id_to_observation[player_id]
+            strategy.train(observation, action, next_state.observation)
+        return next_state
 
 
 class SinglePlayerCulture(Culture):

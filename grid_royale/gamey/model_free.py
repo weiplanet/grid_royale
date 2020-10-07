@@ -55,9 +55,7 @@ class TrainingData:
         self.old_observation_neuron_array[self.counter_modulo] = old_observation.to_neurons()
         self.action_neuron_array[self.counter_modulo] = action.to_neurons()
         self.new_observation_neuron_array[self.counter_modulo] = new_observation.to_neurons()
-        self.reward_array[self.counter_modulo] = getattr(
-            new_observation, self.model_free_learning_strategy.reward_name
-        )
+        self.reward_array[self.counter_modulo] = new_observation.reward
         self.are_not_end_array[self.counter_modulo] = int(not new_observation.is_end)
         self.counter += 1
 
