@@ -208,7 +208,8 @@ class ThresholdStrategy(BlackjackStrategy):
 class RandomStrategy(BlackjackStrategy, gamey.RandomStrategy):
     pass
 
-class ModelBasedLearningStrategy(BlackjackStrategy, gamey.ModelBasedLearningStrategy):
+class ModelBasedEpisodicLearningStrategy(BlackjackStrategy,
+                                         gamey.ModelBasedEpisodicLearningStrategy):
     pass
 
 class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrategy):
@@ -221,7 +222,7 @@ def demo(n_training_games: int = 1_000) -> None:
 
     # model_free_learning_strategy.get_score(n=1_000)
     learning_strategies = [
-        ModelBasedLearningStrategy(gamma=1),
+        ModelBasedEpisodicLearningStrategy(gamma=1),
         ModelFreeLearningStrategy(gamma=1)
     ]
     strategies = [

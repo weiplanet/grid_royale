@@ -29,13 +29,12 @@ from .base import Observation, Action, ActionObservation
 from . import utils
 
 
-class ModelBasedLearningStrategy(Strategy):
-    def __init__(self, curiosity: numbers.Real = 2, gamma: numbers.Real = 0.9,
-                 learning_delay: int = 10) -> None:
+class ModelBasedEpisodicLearningStrategy(Strategy):
+    def __init__(self, curiosity: numbers.Real = 2, gamma: numbers.Real = 0.9) -> None:
         self.q_map = QMap()
         self.curiosity = curiosity
         self.gamma = gamma
-        self.learning_delay = learning_delay
+        self.action_observation_chains_lists = collections.defaultdict(list)
 
 
     def decide_action_for_observation(self, observation: Observation,
@@ -48,8 +47,26 @@ class ModelBasedLearningStrategy(Strategy):
         )
         return action
 
-    def train(self, observation: Observation, action: Action, q: numbers.Number) -> None:
-        self.q_map.add_sample(observation, action, q)
+    def train(self, observation: Observation, action: Action,
+              next_observation: Observation) -> None:
+
+        action_observation_chains = self.action_observation_chains_lists[observation]
+        try:
+            action_observation_chain = action_observation_chains.pop()
+        except IndexError:
+            action_observation_chain = [ActionObservation(None, observation)]
+
+        action_observation_chain.append(ActionObservation(action, next_observation))
+
+        if next_observation.is_end:
+            del self.action_observation_chains_lists[]
+            self.q_map.add_sample(observation, action, q)
+        else:
+            self.action_observation_chains_lists[next_observation].append(action_observation_chain)
+
+
+
+
 
     # def get_observation_v(self, observation: Observation) -> numbers.Real:
         # raise NotImplementedError
