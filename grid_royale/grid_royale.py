@@ -130,7 +130,7 @@ class _BaseGrid:
 
 
 
-class State(_BaseGrid, gamey.MultiPlayerState):
+class State(_BaseGrid, gamey.State):
 
     def __init__(self, grid_royale: GridRoyale, *, board_size: int,
                  player_infos: ImmutableDict[Position, PlayerInfo],
@@ -690,7 +690,7 @@ logging.getLogger('tensorflow').addFilter(
     lambda record: 'Tracing is expensive and the excessive' not in record.msg
 )
 
-class GridRoyale(gamey.Game):
+class GridRoyaleCulture(gamey.Culture):
     State = State
     Observation = Observation
     Action = Action
