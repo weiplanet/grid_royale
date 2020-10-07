@@ -51,8 +51,8 @@ class ModelBasedLearningStrategy(Strategy):
     def train(self, observation: Observation, action: Action, q: numbers.Number) -> None:
         self.q_map.add_sample(observation, action, q)
 
-    def get_observation_v(self, observation: Observation) -> numbers.Real:
-        raise NotImplementedError
+    # def get_observation_v(self, observation: Observation) -> numbers.Real:
+        # raise NotImplementedError
         # return max(self.get_q_for_observation_action(observation, action) for action in
                    # observation.legal_actions)
 

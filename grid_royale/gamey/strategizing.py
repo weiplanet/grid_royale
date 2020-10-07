@@ -44,7 +44,7 @@ class Strategy(abc.ABC):
 
     def train(self, observation: Observation, action: Action,
               next_observation: Observation) -> None:
-        pass # Put your training logic here, if your strategy requires training.
+        pass # Put your training logic here, if you wish your strategy to have training.
 
 
 class SinglePlayerStrategy(Strategy):
@@ -67,9 +67,10 @@ class RandomStrategy(Strategy):
 
 
 class QStrategy(Strategy):
-    @abc.abstractmethod
-    def get_observation_v(self, observation: Observation) -> numbers.Real:
-        raise NotImplementedError
+
+    # @abc.abstractmethod
+    # def get_observation_v(self, observation: Observation) -> numbers.Real:
+        # raise NotImplementedError
 
     @abc.abstractmethod
     def get_qs_for_observations(self, observations: Sequence[Observation]) \
