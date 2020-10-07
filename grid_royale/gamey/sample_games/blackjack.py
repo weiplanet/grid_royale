@@ -154,7 +154,7 @@ class BlackjackState(gamey.SinglePlayerState):
 
     def __eq__(self, other: Any) -> bool:
         return ((type(self) is type(other)) and
-                (self._as_tuple() == other._as_tuple))
+                (self._as_tuple() == other._as_tuple()))
 
     n_neurons = 5
 
