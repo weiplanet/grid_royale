@@ -103,7 +103,7 @@ class Bullet:
 
 
 @dataclasses.dataclass(order=True, frozen=True)
-class PlayerInfo(gamey.PlayerInfo):
+class PlayerInfo(): # todo: deleting this
     id: Position
     observation: Observation
     strategy: Strategy
