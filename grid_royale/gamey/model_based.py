@@ -30,8 +30,14 @@ from . import utils
 
 
 class ModelBasedEpisodicLearningStrategy(Strategy):
+    '''
+    Model-based episodic learning strategy.
+
+    This strategy assumes we're playing full episodes to the end, and there is no reward
+    discounting.
+    '''
     def __init__(self, curiosity: numbers.Real = 2, gamma: numbers.Real = 0.9) -> None:
-        self.q_map = QMap()
+        self.reward_map = RewardMap()
         self.curiosity = curiosity
         self.gamma = gamma
         self.action_observation_chains_lists = collections.defaultdict(list)
@@ -41,7 +47,7 @@ class ModelBasedEpisodicLearningStrategy(Strategy):
                                        extra: Any = None) -> Action:
         action = max(
             observation.legal_actions,
-            key=lambda action: self.q_map.get_ucb(
+            key=lambda action: self.reward_map.get_ucb(
                 observation, action, curiosity=self.curiosity
             )
         )
@@ -59,11 +65,10 @@ class ModelBasedEpisodicLearningStrategy(Strategy):
         action_observation_chain.append(ActionObservation(action, next_observation))
 
         if next_observation.is_end:
-            del self.action_observation_chains_lists[]
-            self.q_map.add_sample(observation, action, q)
-        else:
-            self.action_observation_chains_lists[next_observation].append(action_observation_chain)
-
+            total_reward = 0
+            for new_action_observation, old_action_observation in \
+                                   utils.iterate_windowed_pairs(reversed(action_observation_chain)):
+                self.reward_map.add_sample(observation, action, q)
 
 
 
@@ -80,28 +85,28 @@ def _zero_maker():
     return 0
 
 
-class QMap(collections.abc.Mapping):
+class RewardMap(collections.abc.Mapping):
     def __init__(self) -> None:
-        self._q_values = collections.defaultdict(_zero_maker)
+        self._reward_values = collections.defaultdict(_zero_maker)
         self._n_samples = collections.defaultdict(_zero_maker)
         self.n_total_samples = 0
 
-    __len__ = lambda self: len(self._q_values)
-    __iter__ = lambda self: iter(self._q_values)
+    __len__ = lambda self: len(self._reward_values)
+    __iter__ = lambda self: iter(self._reward_values)
 
     def __getitem__(self, observation_and_action: Iterable) -> numbers.Real:
-        return self._q_values[self._to_key(*observation_and_action)]
+        return self._reward_values[self._to_key(*observation_and_action)]
 
     def _to_key(self, observation: Observation, action: Action) -> Tuple(bytes, Action):
         return (observation.to_neurons().tobytes(), action)
 
 
-    def add_sample(self, observation: Observation, action: Action, q: numbers.Real) -> None:
+    def add_sample(self, observation: Observation, action: Action, reward: numbers.Real) -> None:
         key = self._to_key(observation, action)
-        self._q_values[key] = (
-            self._q_values[key] *
+        self._reward_values[key] = (
+            self._reward_values[key] *
             (self._n_samples[key] / (self._n_samples[key] + 1)) +
-            q * (1 / (self._n_samples[key] + 1))
+            reward * (1 / (self._n_samples[key] + 1))
         )
         self._n_samples[key] += 1
         self.n_total_samples += 1
@@ -109,7 +114,7 @@ class QMap(collections.abc.Mapping):
     def get_ucb(self, observation: Observation, action: Action,
                 curiosity: numbers.Real) -> numbers.Real:
         key = self._to_key(observation, action)
-        return self._q_values[key] + curiosity * math.sqrt(
+        return self._reward_values[key] + curiosity * math.sqrt(
             utils.cute_div(
                 math.log(self.n_total_samples + 2),
                 self._n_samples[key]
