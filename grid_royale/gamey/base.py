@@ -25,6 +25,7 @@ import tensorflow as tf
 import numpy as np
 
 from .utils import ImmutableDict
+from . import exceptions
 
 
 
@@ -170,13 +171,15 @@ class Culture:
         yield state
         iterator = range(1, max_length) if max_length is not None else itertools.count(1)
         for i in iterator:
-            state = self.get_next_state(state)
-            yield state
             if state.is_end:
                 return
+            state = self.get_next_state(state)
+            yield state
 
 
     def get_next_state(self, state: State) -> State:
+        if state.is_end:
+            raise exceptions.GameOver
         player_id_to_action = {
             player_id: self.player_id_to_strategy[player_id
                                                         ].decide_action_for_observation(observation)

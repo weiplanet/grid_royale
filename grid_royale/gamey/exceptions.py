@@ -14,3 +14,5 @@ class IllegalAction(GameyException):
         GameyException.__init__(self, f"Can't play {action} in this state.")
 
 
+class GameOver(GameyException):
+    pass
