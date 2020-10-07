@@ -187,7 +187,7 @@ class Culture:
         for player_id, action in player_id_to_action.items():
             strategy = self.player_id_to_strategy[player_id]
             observation = state.player_id_to_observation[player_id]
-            strategy.train(observation, action, next_state.observation)
+            strategy.train(observation, action, next_state.player_id_to_observation[player_id])
         return next_state
 
 
