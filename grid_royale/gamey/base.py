@@ -146,22 +146,24 @@ class Culture:
     State: Type[State]
     player_id_to_strategy: Mapping[PlayerId, strategizing.Strategy]
 
-    def grind(self, *, n: int = 10, max_game_length: int = 100,
-              state_factory: Optional[Callable] = None) -> Iterator[State]:
+    def iterate_many_games(self, *, n: int = 10, max_length: int = 100,
+                           state_factory: Optional[Callable] = None) -> Iterator[State]:
         state_factory = ((lambda: self.State.make_initial()) if state_factory is None
                          else state_factory)
         for i in range(n):
-            print(f'Training round {i}...')
             state: State = state_factory()
-            yield from more_itertools.islice_extended(self.iterate_states(state))[:max_game_length]
-        print('Done training.')
+            yield from self.iterate_game(state, max_length)
 
 
-    def iterate_states(self, state: State) -> Iterator[State]:
+    def iterate_game(self, state: State, max_length: Optional[int] = None) -> Iterator[State]:
         yield state
-        while not state.is_end:
+        iterator = range(1, max_length) if max_length is not None else itertools.count(1)
+        for i in iterator:
             state = self.get_next_state(state)
             yield state
+            if state.is_end:
+                return
+
 
     def get_next_state(self, state: State) -> State:
         player_id_to_action = {

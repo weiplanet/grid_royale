@@ -21,7 +21,7 @@ import keras.models
 import tensorflow as tf
 import numpy as np
 
-from .base import Observation, Action, ActionObservation
+from .base import Observation, Action, ActionObservation, SinglePlayerCulture
 from . import utils
 
 
@@ -30,28 +30,7 @@ from . import utils
 class Strategy(abc.ABC):
 
     gamma: numbers.Real = 1
-    reward_name: str = 'reward'
     State: Type[State]
-
-    def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
-                  forced_gamma: Optional[numbers.Real] = None,
-                  max_game_length: Optional[int] = None) -> int:
-
-        make_observation = (self.State.Observation.make_initial if observation_factory is None
-                      else observation_factory)
-        gamma = self.gamma if not forced_gamma else forced_gamma
-        return sum(
-            sum(
-                (gamma ** i) * getattr(action_observation.observation, self.reward_name)
-                for i, action_observation in
-                enumerate(
-                    more_itertools.islice_extended(
-                        self.iterate_game(make_observation())
-                    )[:max_game_length]
-                )
-            )
-            for _ in range(n)
-        )
 
     @abc.abstractmethod
     def decide_action_for_observation(self, observation: Observation,
@@ -77,7 +56,34 @@ class Strategy(abc.ABC):
 
     def train(self, observation: Observation, action: Action,
               next_observation: Observation) -> None:
-        pass # Put your training logic here, if you wish.
+        pass # Put your training logic here, if your strategy requires training.
+
+
+class SinglePlayerStrategy(Strategy):
+
+    def get_score(self, n: int = 1_000, observation_factory: Optional[Callable] = None,
+                  forced_gamma: Optional[numbers.Real] = None,
+                  max_length: Optional[int] = None) -> int:
+
+        single_player_culture = SinglePlayerCulture(self)
+        single_player_culture
+        make_observation = (self.State.make_initial() if observation_factory is None
+                      else observation_factory)
+        gamma = self.gamma if not forced_gamma else forced_gamma
+        return sum(
+            sum(
+                (gamma ** i) * action_observation.observation.reward
+                for i, action_observation in
+                enumerate(
+                    more_itertools.islice_extended(
+                        self.iterate_game(make_observation())
+                    )[:max_length]
+                )
+            )
+            for _ in range(n)
+        )
+
+
 
 
 

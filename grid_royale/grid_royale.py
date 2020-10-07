@@ -454,7 +454,7 @@ class State(_BaseGrid, gamey.MultiPlayerState):
 
 
     def write_to_folder(self, folder: pathlib.Path, *, chunk: int = 10,
-                        max_game_length: Optional[int] = None, overwrite: bool = False):
+                        max_length: Optional[int] = None, overwrite: bool = False):
         ### Preparing folder: #################################################
         #                                                                     #
         if not folder.exists():
@@ -469,7 +469,7 @@ class State(_BaseGrid, gamey.MultiPlayerState):
 
         paths = ((folder / f'{i:06d}.json') for i in range(10 ** 6))
         state_iterator = more_itertools.islice_extended(
-                                                      self.iterate_states())[:max_game_length]
+                                                      self.iterate_states())[:max_length]
         for path in paths:
             state_chunk = []
             for state in more_itertools.islice_extended(state_iterator)[:chunk]:
@@ -481,7 +481,7 @@ class State(_BaseGrid, gamey.MultiPlayerState):
             with path.open('wb') as file:
                 json.dump(output, file)
 
-    def write_to_pal(self, *, chunk: int = 10, max_game_length: Optional[int] = None):
+    def write_to_pal(self, *, chunk: int = 10, max_length: Optional[int] = None):
         games_folder: pathlib.Path = (current_folder.parent / 'pal' / 'games').resolve().absolute()
         now = datetime_module.datetime.now()
         game_folder_name = now.isoformat(sep='-', timespec='microseconds'
@@ -489,7 +489,7 @@ class State(_BaseGrid, gamey.MultiPlayerState):
         game_folder = games_folder / game_folder_name
         game_folder.mkdir(parents=True)
         print(f'Writing to {game_folder.name} ...')
-        for state in self.write_to_folder(game_folder, chunk=chunk, max_game_length=max_game_length,
+        for state in self.write_to_folder(game_folder, chunk=chunk, max_length=max_length,
                                           overwrite=True):
             yield state
         print(f'Finished writing to {game_folder.name} .')
@@ -709,9 +709,9 @@ class GridRoyale(gamey.Game):
         return BASE_COLLISION_REWARD
 
 
-    def grind(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
+    def grind(self, *, n: int = 10, max_length: int = 100) -> Iterator[State]:
         yield from super().grind(
-            self.core_strategies, n=n, max_game_length=max_game_length,
+            self.core_strategies, n=n, max_length=max_length,
             state_factory=self.make_initial
         )
 
@@ -884,7 +884,7 @@ def run():
     global grid_royale, state, strategies
     grid_royale = GridRoyale()
 
-    # for _ in grid_royale.train(n=2, max_game_length=100):
+    # for _ in grid_royale.train(n=2, max_length=100):
         # pass
     state = grid_royale.make_initial()
     for i in range(2_000):
