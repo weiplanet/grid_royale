@@ -105,7 +105,7 @@ class Observation(abc.ABC):
     state: State
     legal_actions: Tuple[Action, ...]
     is_end: bool
-    reward: Optional[numbers.Real] = None
+    reward: numbers.Real
     n_neurons: int
 
     @abc.abstractmethod
@@ -132,6 +132,9 @@ class State(abc.ABC):
 
 
 class SinglePlayerState(State, Observation):
+
+    player_id_to_observation = property(lambda self: ImmutableDict({None: self}))
+
 
     @abc.abstractmethod
     def get_next_state_from_action(self, action: Action) -> SinglePlayerState:

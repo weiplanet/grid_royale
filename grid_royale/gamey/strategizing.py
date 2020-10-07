@@ -36,17 +36,6 @@ class Strategy(abc.ABC):
                                        extra: Any = None) -> Action:
         raise NotImplementedError
 
-    def iterate_game(self, observation: Observation) -> Iterator[ActionObservation]:
-        action_observation = ActionObservation(None, observation)
-        while True:
-            yield action_observation
-            if action_observation.observation.is_end:
-                return
-            action_observation = ActionObservation(
-                (action := self.decide_action_for_observation(action_observation.observation)),
-                action_observation.observation.state.get_next_observation(action)
-            )
-
     def __repr__(self) -> str:
         return f'{type(self).__name__}{self._extra_repr()}'
 
@@ -61,28 +50,13 @@ class Strategy(abc.ABC):
 class SinglePlayerStrategy(Strategy):
 
     def get_score(self, n: int = 1_000, state_factory: Optional[Callable] = None,
-                  gamma: Optional[numbers.Real] = None,
                   max_length: Optional[int] = None) -> int:
 
         single_player_culture = SinglePlayerCulture(self)
-        single_player_culture.iterate_many_games(n=n, max_length=max_length,
-                                                 state_factory=state_factory)
-        make_state = (self.State.make_initial() if state_factory is None else state_factory)
-        gamma_ = self.gamma if gamma is None else gamma
         return sum(
-            sum(
-                (gamma_ ** i) * action_observation.observation.reward
-                for i, action_observation in
-                enumerate(
-                    more_itertools.islice_extended(
-                        self.iterate_game(make_state())
-                    )[:max_length]
-                )
-            )
-            for _ in range(n)
+            single_player_state.reward for single_player_state in single_player_culture.
+                         iterate_many_games(n=n, max_length=max_length, state_factory=state_factory)
         )
-
-
 
 
 
