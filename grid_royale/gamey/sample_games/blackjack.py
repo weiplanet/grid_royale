@@ -65,8 +65,7 @@ class State(gamey.State, gamey.Observation):
 
     reward = 0
 
-    def __init__(self, player_cards: Tuple[int, ...],
-                 dealer_cards: Tuple[int, ...]) -> None:
+    def __init__(self, player_cards: Tuple[int, ...], dealer_cards: Tuple[int, ...]) -> None:
         self.player_cards = tuple(sorted(player_cards))
         self.dealer_cards = tuple(sorted(dealer_cards))
 
