@@ -697,6 +697,35 @@ logging.getLogger('tensorflow').addFilter(
     lambda record: 'Tracing is expensive and the excessive' not in record.msg
 )
 
+class GridRoyale(gamey.Game):
+    State = State
+    Observation = Observation
+    Action = Action
+
+    def __init__(self, n_players: int = 20):
+        self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
+        self.strategies = tuple(more_itertools.islice_extended(
+                                                 itertools.cycle(self.core_strategies))[:n_players])
+        self.executor = concurrent.futures.ProcessPoolExecutor(5)
+
+    def get_collision_reward(self, strategy: gamey.Strategy) -> numbers.Real:
+        # try:
+            # return (self.core_strategies.index(strategy) + 1) * BASE_COLLISION_REWARD
+        # except ValueError:
+            # return BASE_COLLISION_REWARD
+        return BASE_COLLISION_REWARD
+
+
+    def train(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
+        yield from State.train(
+            self.core_strategies, n=n, max_game_length=max_game_length,
+            state_factory=self.make_initial
+        )
+
+    def make_initial(self) -> State:
+        return State.make_initial(self, self.strategies)
+
+
 class _GridRoyaleStrategy(gamey.Strategy):
     Game = GridRoyale
 
@@ -850,33 +879,6 @@ class Strategy(_GridRoyaleStrategy):
 
 
 
-class GridRoyale(gamey.Game):
-    State = State
-    Observation = Observation
-    Action = Action
-
-    def __init__(self, n_players: int = 20):
-        self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
-        self.strategies = tuple(more_itertools.islice_extended(
-                                                 itertools.cycle(self.core_strategies))[:n_players])
-        self.executor = concurrent.futures.ProcessPoolExecutor(5)
-
-    def get_collision_reward(self, strategy: gamey.Strategy) -> numbers.Real:
-        # try:
-            # return (self.core_strategies.index(strategy) + 1) * BASE_COLLISION_REWARD
-        # except ValueError:
-            # return BASE_COLLISION_REWARD
-        return BASE_COLLISION_REWARD
-
-
-    def train(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
-        yield from State.train(
-            self.core_strategies, n=n, max_game_length=max_game_length,
-            state_factory=self.make_initial
-        )
-
-    def make_initial(self) -> State:
-        return State.make_initial(self, self.strategies)
 
 
 
