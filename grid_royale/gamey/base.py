@@ -173,13 +173,6 @@ class SinglePlayerState(State, Observation):
 class MultiPlayerState(State):
     player_infos: Mapping[Hashable, PlayerInfo]
 
-    def get_next_state(self) -> State:
-        player_id_to_action = {
-            id: player_info.strategy.decide_action_for_observation(player_info.observation)
-            for id, player_info in self.player_infos.items() if not player_info.observation.is_end
-        }
-        return self.get_next_state_from_actions(player_id_to_action)
-
     @abc.abstractmethod
     def get_next_state_from_actions(self, player_id_to_action: Mapping[Hashable, Action]) \
                                                                                       -> State:
