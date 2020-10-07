@@ -191,8 +191,6 @@ class Culture:
 
 class SinglePlayerCulture(Culture):
 
-    player_id_to_strategy = property(lambda self: collections.defaultdict(lambda: self.strategy))
-
     def __init__(self, state_type: Type[SinglePlayerState], *,
                  strategy: strategizing.Strategy) -> None:
         self.strategy = strategy

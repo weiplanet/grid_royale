@@ -3,3 +3,4 @@ from .base import (Observation, State, SinglePlayerState, Action, ActionObservat
 from .strategizing import Strategy, RandomStrategy, SinglePlayerStrategy, QStrategy
 from .model_free import ModelFreeLearningStrategy
 from .model_based import ModelBasedLearningStrategy
+from . import exceptions
