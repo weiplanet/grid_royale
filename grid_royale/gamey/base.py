@@ -112,7 +112,7 @@ class Observation(abc.ABC):
     def to_neurons(self) -> np.ndarray:
         raise NotImplementedError
 
-PlayerId = TypeVar('PlayerId', Hashable)
+PlayerId = TypeVar('PlayerId', bound=Hashable)
 
 class State(abc.ABC):
     Observation: Type[Observation]
