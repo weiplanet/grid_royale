@@ -24,7 +24,7 @@ import keras.models
 import tensorflow as tf
 import numpy as np
 
-from .strategizing import Strategy, NiceStrategy
+from .strategizing import Strategy, QStrategy
 from .base import Observation, Action, ActionObservation
 from . import utils
 

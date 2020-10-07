@@ -24,7 +24,7 @@ import keras.models
 import numpy as np
 
 from .base import Observation, Action, ActionObservation
-from .strategizing import Strategy, NiceStrategy
+from .strategizing import Strategy, QStrategy
 from . import utils
 
 def _fit_external(model: keras.Model, *args, **kwargs) -> list:
@@ -85,7 +85,7 @@ class TrainingData:
 
 
 
-class ModelFreeLearningStrategy(NiceStrategy):
+class ModelFreeLearningStrategy(QStrategy):
     def __init__(self, *, epsilon: numbers.Real = 0.3, gamma: numbers.Real = 0.9,
                  training_batch_size: int = 100, loss: str = 'mse', optimizer: str = 'rmsprop',
                  n_epochs: int = 50) -> None:

@@ -82,7 +82,7 @@ class RandomStrategy(Strategy):
         return random.choice(observation.legal_actions)
 
 
-class NiceStrategy(Strategy):
+class QStrategy(Strategy):
     @abc.abstractmethod
     def get_observation_v(self, observation: Observation) -> numbers.Real:
         raise NotImplementedError

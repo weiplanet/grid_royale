@@ -129,6 +129,34 @@ class State(abc.ABC):
     def make_initial() -> State:
         raise NotImplementedError
 
+
+
+class SinglePlayerState(State, Observation):
+
+    @abc.abstractmethod
+    def get_next_state_from_action(self, action: Action) -> SinglePlayerState:
+        raise NotImplementedError
+
+    def get_next_state_from_actions(self, player_id_to_action: Mapping[PlayerId, Action]) \
+                                                                               -> SinglePlayerState:
+        return self.get_next_state_from_action(more_itertools.one(player_id_to_action.values()))
+
+
+class Culture:
+    State: Type[State]
+    player_id_to_strategy: Mapping[PlayerId, strategizing.Strategy]
+
+    def grind(self, *, n: int = 10, max_game_length: int = 100,
+              state_factory: Optional[Callable] = None) -> Iterator[State]:
+        state_factory = ((lambda: self.State.make_initial()) if state_factory is None
+                         else state_factory)
+        for i in range(n):
+            print(f'Training round {i}...')
+            state: State = state_factory()
+            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
+        print('Done training.')
+
+
     def iterate_states(self) -> Iterator[State]:
         state = self
         yield state
@@ -136,20 +164,7 @@ class State(abc.ABC):
             state = state.get_next_state()
             yield state
 
-
-class SinglePlayerState(State, Observation):
-    pass
-
-
-class MultiPlayerState(State):
-    player_infos: Mapping[Hashable, PlayerInfo]
-
-    @abc.abstractmethod
-    def get_next_state_from_actions(self, player_id_to_action: Mapping[Hashable, Action]) \
-                                                                                      -> State:
-        raise NotImplemented
-
-    def get_next_state(self) -> State:
+    def get_next_state(self, state: State) -> State:
         strategy_to_ids_and_player_infos = more_itertools.map_reduce(
             self.player_infos.items(),
             keyfunc=lambda id_and_player_info: id_and_player_info[1].strategy,
@@ -158,7 +173,7 @@ class MultiPlayerState(State):
 
         player_id_to_q_map = {}
         for strategy, ids_and_player_infos in strategy_to_ids_and_player_infos.items():
-            strategy: strategizing.NiceStrategy
+            strategy: strategizing.QStrategy
             ids, player_infos = zip(*ids_and_player_infos)
             observations = tuple(player_info.observation for player_info in player_infos)
             q_maps = strategy.get_qs_for_observations(observations)
@@ -173,25 +188,6 @@ class MultiPlayerState(State):
         return self.get_next_state_from_actions(player_id_to_action)
 
 
-class Game:
-    State: Type[State]
-
-    # def __init__(self):
-        # assert issubclass(self.State, State)
-        # assert issubclass(self.Observation, Observation)
-        # assert issubclass(self.Action, Action)
-
-
-    def grind(self, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
-              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
-                                                                                 -> Iterator[State]:
-        state_factory = ((lambda: self.State.make_initial(strategies)) if state_factory is None
-                               else state_factory)
-        for i in range(n):
-            print(f'Training round {i}...')
-            state: State = state_factory()
-            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
-        print('Done training.')
 
 
 class _SinglePlayerGameType(type):
