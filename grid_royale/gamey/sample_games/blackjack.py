@@ -271,6 +271,6 @@ if __name__ == '__main__':
     if len(sys.argv) >= 2:
         n_training_games = int(sys.argv[1])
     else:
-        n_training_games = 1_000
+        n_training_games = 100_000
     demo(n_training_games=n_training_games)
 
