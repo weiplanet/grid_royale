@@ -119,16 +119,16 @@ class State(gamey.SinglePlayerState):
 
 
 
-    def get_next_observation(self, action: Action) -> Observation:
+    def get_next_state_from_action(self, action: Action) -> State:
         if action not in self.legal_actions:
             raise gamey.exceptions.IllegalAction(action)
         if self.player_stuck or action == Action.stick:
-            return Observation(
+            return State(
                 self.player_cards,
                 self.dealer_cards + (get_random_card(),)
             )
         else:
-            return Observation(
+            return State(
                 self.player_cards + (get_random_card(),),
                 self.dealer_cards
             )

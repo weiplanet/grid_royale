@@ -683,13 +683,6 @@ class Observation(_BaseGrid, gamey.Observation):
                                 for food_position in self.state.food_positions),
                                 default=(-100))
 
-    @staticmethod
-    def make_initial() -> Observation:
-        return next(iter(State.make_initial().player_infos.values())).observation
-
-    def get_next_observation(self, action: Action) -> Observation:
-        raise NotImplementedError
-
     def p(self) -> None:
         print(self.ascii)
 
@@ -717,7 +710,7 @@ class GridRoyale(gamey.Game):
 
 
     def grind(self, *, n: int = 10, max_game_length: int = 100) -> Iterator[State]:
-        yield from State.grind(
+        yield from super().grind(
             self.core_strategies, n=n, max_game_length=max_game_length,
             state_factory=self.make_initial
         )

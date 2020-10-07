@@ -65,7 +65,7 @@ class Strategy(abc.ABC):
                 return
             action_observation = ActionObservation(
                 (action := self.decide_action_for_observation(action_observation.observation)),
-                action_observation.observation.get_next_observation(action)
+                action_observation.observation.state.get_next_observation(action)
             )
 
     def __repr__(self) -> str:

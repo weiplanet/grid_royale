@@ -106,19 +106,11 @@ class Action(metaclass=_ActionType):
 
 
 class Observation(abc.ABC):
+    state: State
     legal_actions: Tuple[Action, ...]
     is_end: bool
     reward: Optional[numbers.Real] = None
     n_neurons: int
-
-    @abc.abstractmethod
-    def get_next_observation(self, action: Action) -> Observation:
-        raise NotImplementedError
-
-    @staticmethod
-    @abc.abstractmethod
-    def make_initial() -> Observation:
-        raise NotImplementedError
 
     @abc.abstractmethod
     def to_neurons(self) -> np.ndarray:
@@ -133,7 +125,6 @@ class PlayerInfo(abc.ABC):
 
 
 class State(abc.ABC):
-    # todo: This shouldn't be in base.py anymore
     is_end: bool
 
     @abc.abstractmethod
@@ -152,18 +143,6 @@ class State(abc.ABC):
             state = state.get_next_state()
             yield state
 
-
-    @classmethod
-    def grind(cls, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
-              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
-                                                                                 -> Iterator[State]:
-        state_factory = ((lambda: cls.make_initial(strategies)) if state_factory is None
-                               else state_factory)
-        for i in range(n):
-            print(f'Training round {i}...')
-            state: State = state_factory()
-            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
-        print('Done training.')
 
 
 class SinglePlayerState(State, Observation):
@@ -213,11 +192,32 @@ class Game:
         assert issubclass(self.Action, Action)
 
 
+    def grind(self, strategies: Tuple[strategizing.Strategy], *, n: int = 10,
+              max_game_length: int = 100, state_factory: Optional[Callable] = None) \
+                                                                                 -> Iterator[State]:
+        state_factory = ((lambda: self.State.make_initial(strategies)) if state_factory is None
+                               else state_factory)
+        for i in range(n):
+            print(f'Training round {i}...')
+            state: State = state_factory()
+            yield from more_itertools.islice_extended(state.iterate_states())[:max_game_length]
+        print('Done training.')
+
+
 class _SinglePlayerGameType(type):
     Observation = property(lambda cls: cls.State)
 
+
 class SinglePlayerGame(Game, metaclass=_SinglePlayerGameType):
-    pass
+    strategy: strategizing.Strategy
+    state = property(lambda self: self)
+
+    def get_next_state(self) -> State:
+        return self.get_next_state_from_action(self.strategy.decide_action_for_observation(self))
+
+    @abc.abstractmethod
+    def get_next_state_from_action(self, action: Action) -> State:
+        raise NotImplementedError
 
 class MultiPlayerGame(Game):
     pass
