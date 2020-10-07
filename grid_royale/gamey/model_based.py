@@ -24,7 +24,7 @@ import keras.models
 import tensorflow as tf
 import numpy as np
 
-from .strategizing import Strategy, QStrategy
+from .strategizing import Strategy
 from .base import Observation, Action, ActionObservation
 from . import utils
 
@@ -68,16 +68,9 @@ class ModelBasedEpisodicLearningStrategy(Strategy):
             total_reward = 0
             for new_action_observation, old_action_observation in \
                                    utils.iterate_windowed_pairs(reversed(action_observation_chain)):
-                self.reward_map.add_sample(observation, action, q)
-
-
-
-
-    # def get_observation_v(self, observation: Observation) -> numbers.Real:
-        # raise NotImplementedError
-        # return max(self.get_q_for_observation_action(observation, action) for action in
-                   # observation.legal_actions)
-
+                total_reward += new_action_observation.observation.reward
+                self.reward_map.add_sample(old_action_observation.observation,
+                                           new_action_observation.observation, total_reward)
 
 
 
