@@ -130,7 +130,7 @@ class State(abc.ABC):
         raise NotImplementedError
 
 
-class _SinglePlayerStateType(type):
+class _SinglePlayerStateType(abc.ABCMeta):
     @property
     def Observation(cls) -> _SinglePlayerStateType:
         return cls
