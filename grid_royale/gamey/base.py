@@ -117,12 +117,6 @@ class Observation(abc.ABC):
         raise NotImplementedError
 
 
-@dataclasses.dataclass(order=True, frozen=True)
-class PlayerInfo(abc.ABC):
-    id: Hashable
-    observation: Observation
-    strategy: strategizing.Strategy
-
 
 class State(abc.ABC):
     is_end: bool
