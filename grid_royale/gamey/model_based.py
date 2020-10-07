@@ -70,7 +70,9 @@ class ModelBasedEpisodicLearningStrategy(Strategy):
                                    utils.iterate_windowed_pairs(reversed(action_observation_chain)):
                 total_reward += new_action_observation.observation.reward
                 self.reward_map.add_sample(old_action_observation.observation,
-                                           new_action_observation.observation, total_reward)
+                                           new_action_observation.action, total_reward)
+        else:
+            self.action_observation_chains_lists[next_observation].append(action_observation_chain)
 
 
 
@@ -90,8 +92,11 @@ class RewardMap(collections.abc.Mapping):
     def __getitem__(self, observation_and_action: Iterable) -> numbers.Real:
         return self._reward_values[self._to_key(*observation_and_action)]
 
-    def _to_key(self, observation: Observation, action: Action) -> Tuple(bytes, Action):
-        return (observation.to_neurons().tobytes(), action)
+    def _to_key(self, observation: Observation, action: Action) -> Tuple[Observation, Action]:
+        assert isinstance(observation, Observation)
+        assert isinstance(action, Action)
+        return (observation, action)
+
 
 
     def add_sample(self, observation: Observation, action: Action, reward: numbers.Real) -> None:
