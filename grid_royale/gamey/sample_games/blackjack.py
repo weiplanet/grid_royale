@@ -217,7 +217,7 @@ class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrate
 
 
 
-def demo(n_training_games: int = 10_000) -> None:
+def demo(n_training_games: int) -> None:
     print('Starting Blackjack demo.')
 
     # model_free_learning_strategy.get_score(n=1_000)
@@ -235,12 +235,12 @@ def demo(n_training_games: int = 10_000) -> None:
         *learning_strategies,
     ]
 
-    print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 100 games "
+    print(f"Let's compare {len(strategies)} Blackjack strategies. First we'll play 500 games "
           f"on each strategy and observe the scores:\n")
 
     def print_summary():
         strategies_and_scores = sorted(
-            ((strategy, strategy.get_score(100)) for strategy in strategies),
+            ((strategy, strategy.get_score(500)) for strategy in strategies),
             key=lambda x: x[1], reverse=True
         )
         for strategy, score in strategies_and_scores:
@@ -268,5 +268,9 @@ def demo(n_training_games: int = 10_000) -> None:
 
 
 if __name__ == '__main__':
-    demo()
+    if len(sys.argv) >= 2:
+        n_training_games = int(sys.argv[1])
+    else:
+        n_training_games = 1_000
+    demo(n_training_games=n_training_games)
 
