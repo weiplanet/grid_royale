@@ -21,7 +21,7 @@ import keras.models
 import tensorflow as tf
 import numpy as np
 
-from .base import Observation, Action, StateActionReward, ActionObservation
+from .base import Observation, Action, ActionObservation
 from . import utils
 
 

@@ -23,7 +23,7 @@ import more_itertools
 import keras.models
 import numpy as np
 
-from .base import StateActionReward, Observation, Action, ActionObservation
+from .base import Observation, Action, ActionObservation
 from .strategizing import Strategy, NiceStrategy
 from . import utils
 

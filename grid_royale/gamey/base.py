@@ -36,12 +36,6 @@ class _NiceDataclass(collections.abc.Sequence):
     __getitem__ = lambda self, i: tuple(self)[i]
 
 @dataclasses.dataclass(order=True, frozen=True)
-class StateActionReward(_NiceDataclass):
-    observation: Observation
-    action: Action
-    reward: numbers.Real
-
-@dataclasses.dataclass(order=True, frozen=True)
 class ActionObservation(_NiceDataclass):
     action: Optional[Action]
     observation: Observation
