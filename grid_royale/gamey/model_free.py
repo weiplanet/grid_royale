@@ -32,19 +32,20 @@ def _fit_external(model: keras.Model, *args, **kwargs) -> list:
     return model.get_weights()
 
 class TrainingData:
-    def __init__(self, awesome_strategy: ModelFreeLearningStrategy, max_size=10_000) -> None:
-        self.awesome_strategy = awesome_strategy
+    def __init__(self, model_free_learning_strategy: ModelFreeLearningStrategy, *,
+                 max_size: int = 10_000) -> None:
+        self.model_free_learning_strategy = model_free_learning_strategy
         self.max_size = max_size
         self.counter = 0
         self._last_trained_batch = 0
         self.old_observation_neuron_array = np.zeros(
-            (max_size, awesome_strategy.observation_type.n_neurons)
+            (max_size, model_free_learning_strategy.Game.Observation.n_neurons)
         )
         self.new_observation_neuron_array = np.zeros(
-            (max_size, awesome_strategy.observation_type.n_neurons)
+            (max_size, model_free_learning_strategy.Game.Observation.n_neurons)
         )
         self.action_neuron_array = np.zeros(
-            (max_size,awesome_strategy.observation_type.action_type.n_neurons)
+            (max_size,model_free_learning_strategy.Game.Action.n_neurons)
         )
         self.reward_array = np.zeros(max_size)
         self.are_not_end_array = np.zeros(max_size)
@@ -54,19 +55,21 @@ class TrainingData:
         self.old_observation_neuron_array[self.counter_modulo] = old_observation.to_neurons()
         self.action_neuron_array[self.counter_modulo] = action.to_neurons()
         self.new_observation_neuron_array[self.counter_modulo] = new_observation.to_neurons()
-        self.reward_array[self.counter_modulo] = getattr(new_observation,
-                                                         self.awesome_strategy.reward_name)
+        self.reward_array[self.counter_modulo] = getattr(
+            new_observation, self.model_free_learning_strategy.reward_name
+        )
         self.are_not_end_array[self.counter_modulo] = int(not new_observation.is_end)
         self.counter += 1
 
 
     def is_training_time(self) -> bool:
-        n_batches = self.counter // self.awesome_strategy.training_batch_size
+        n_batches = self.counter // self.model_free_learning_strategy.training_batch_size
         return n_batches > self._last_trained_batch
 
 
     def mark_trained(self) -> None:
-        self._last_trained_batch = self.counter // self.awesome_strategy.training_batch_size
+        self._last_trained_batch = \
+                               self.counter // self.model_free_learning_strategy.training_batch_size
         assert not self.is_training_time()
 
     @property
@@ -95,7 +98,7 @@ class ModelFreeLearningStrategy(NiceStrategy):
             layers=(
                 keras.layers.Dense(
                     128, activation='relu',
-                    input_dim=self.observation_type.n_neurons
+                    input_dim=self.Game.Observation.n_neurons
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
@@ -107,7 +110,7 @@ class ModelFreeLearningStrategy(NiceStrategy):
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
-                     self.observation_type.action_type.n_neurons, # activation='relu'
+                     self.Game.Action.n_neurons, # activation='relu'
                 ),
 
             ),
@@ -120,7 +123,7 @@ class ModelFreeLearningStrategy(NiceStrategy):
 
 
     def train(self, executor: Optional[concurrent.futures.Executor] = None) -> None:
-        n_actions = len(self.observation_type.action_type)
+        n_actions = len(self.Game.Action)
         slicer = ((lambda x: x) if self.training_data.filled_max_size else
                   (lambda x: x[:self.training_data.counter_modulo]))
         old_observation_neurons = slicer(self.training_data.old_observation_neuron_array)
@@ -181,7 +184,7 @@ class ModelFreeLearningStrategy(NiceStrategy):
             )
             check_action_legality = True
         prediction_output = self.model.predict(input_array)
-        actions = self.observation_type.action_type
+        actions = tuple(self.Game.Action)
         if check_action_legality:
             return tuple(
                 {action: q for action, q in dict(zip(actions, output_row)).items()

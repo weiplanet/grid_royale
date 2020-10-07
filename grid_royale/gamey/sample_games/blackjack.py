@@ -49,22 +49,21 @@ class _BlackjackActionType(type(gamey.Action), type(enum.Enum)):
     pass
 
 
-class BlackjackAction(gamey.Action, enum.Enum, metaclass=_BlackjackActionType):
+class Action(gamey.Action, enum.Enum, metaclass=_BlackjackActionType):
     hit = 'hit'
     stick = 'stick'
     wait = 'wait'
 
-BlackjackAction.all_actions = (BlackjackAction.hit, BlackjackAction.stick,
-                               BlackjackAction.wait)
+Action.all_actions = (Action.hit, Action.stick,
+                               Action.wait)
 
 _card_distribution = tuple(range(1, 10 + 1)) + (10,) * 3
 def get_random_card() -> int:
     return random.choice(_card_distribution)
 
-class BlackjackObservation(gamey.Observation):
+class State(gamey.State, gamey.Observation):
 
     reward = 0
-    action_type = BlackjackAction
 
     def __init__(self, player_cards: Tuple[int, ...],
                  dealer_cards: Tuple[int, ...]) -> None:
@@ -115,29 +114,29 @@ class BlackjackObservation(gamey.Observation):
         if self.is_end:
             self.legal_actions = ()
         elif self.player_stuck:
-            self.legal_actions = (BlackjackAction.wait,)
+            self.legal_actions = (Action.wait,)
         else:
-            self.legal_actions = (BlackjackAction.hit, BlackjackAction.stick,)
+            self.legal_actions = (Action.hit, Action.stick,)
 
 
 
-    def get_next_observation(self, action: BlackjackAction) -> BlackjackObservation:
+    def get_next_observation(self, action: Action) -> Observation:
         if action not in self.legal_actions:
             raise gamey.exceptions.IllegalAction(action)
-        if self.player_stuck or action == BlackjackAction.stick:
-            return BlackjackObservation(
+        if self.player_stuck or action == Action.stick:
+            return Observation(
                 self.player_cards,
                 self.dealer_cards + (get_random_card(),)
             )
         else:
-            return BlackjackObservation(
+            return Observation(
                 self.player_cards + (get_random_card(),),
                 self.dealer_cards
             )
 
     @staticmethod
-    def make_initial() -> BlackjackObservation:
-        return BlackjackObservation(
+    def make_initial() -> State:
+        return State(
             (get_random_card(), get_random_card()),
             (get_random_card(),)
         )
@@ -156,6 +155,7 @@ class BlackjackObservation(gamey.Observation):
         return ((type(self) is type(other)) and
                 (self._as_tuple() == other._as_tuple))
 
+    n_neurons = 5
 
     @functools.lru_cache()
     def to_neurons(self) -> np.ndarray:
@@ -169,44 +169,45 @@ class BlackjackObservation(gamey.Observation):
             ))
         )
 
-    n_neurons = 5
 
 
-class BlackjackGame:
-    action_type
+class Blackjack(gamey.Game):
+    State = Observation = State
+    Action = Action
+
 
 
 
 class BlackjackStrategy(gamey.Strategy):
-    observation_type = BlackjackObservation
+    Game = Blackjack
 
 
 class AlwaysHitStrategy(BlackjackStrategy):
-    def decide_action_for_observation(self, observation: BlackjackObservation,
-                                       extra: Any = None) -> BlackjackAction:
-        return (BlackjackAction.hit if (BlackjackAction.hit in
+    def decide_action_for_observation(self, observation: Observation,
+                                       extra: Any = None) -> Action:
+        return (Action.hit if (Action.hit in
                                        observation.legal_actions)
-                else BlackjackAction.wait)
+                else Action.wait)
 
 class AlwaysStickStrategy(BlackjackStrategy):
-    def decide_action_for_observation(self, observation: BlackjackObservation,
-                                       extra: Any = None) -> BlackjackAction:
-        return (BlackjackAction.stick if (BlackjackAction.stick in
+    def decide_action_for_observation(self, observation: Observation,
+                                       extra: Any = None) -> Action:
+        return (Action.stick if (Action.stick in
                                           observation.legal_actions)
-                else BlackjackAction.wait)
+                else Action.wait)
 
 class ThresholdStrategy(BlackjackStrategy):
     def __init__(self, threshold: int = 17) -> None:
         self.threshold = threshold
 
-    def decide_action_for_observation(self, observation: BlackjackObservation,
-                                       extra: Any = None) -> BlackjackAction:
-        if BlackjackAction.wait in observation.legal_actions:
-            return BlackjackAction.wait
+    def decide_action_for_observation(self, observation: Observation,
+                                       extra: Any = None) -> Action:
+        if Action.wait in observation.legal_actions:
+            return Action.wait
         elif observation.player_sum >= self.threshold:
-            return BlackjackAction.stick
+            return Action.stick
         else:
-            return BlackjackAction.hit
+            return Action.hit
 
     def _extra_repr(self):
         return f'(threshold={self.threshold})'
@@ -226,7 +227,7 @@ class ModelFreeLearningStrategy(BlackjackStrategy, gamey.ModelFreeLearningStrate
 def demo(n_training_games: int = 1_000) -> None:
     print('Starting Blackjack demo.')
 
-    # awesome_strategy.get_score(n=1_000)
+    # model_free_learning_strategy.get_score(n=1_000)
     learning_strategies = [
         ModelBasedLearningStrategy(gamma=1),
         ModelFreeLearningStrategy(gamma=1)

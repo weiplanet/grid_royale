@@ -132,14 +132,12 @@ class _BaseGrid:
 
 class State(_BaseGrid, gamey.NiceState):
 
-    action_type = Action
-
-    def __init__(self, universe: Universe, *, board_size: int,
+    def __init__(self, grid_royale: GridRoyale, *, board_size: int,
                  player_infos: immutabledict[Position, PlayerInfo],
                  food_positions: FrozenSet[Position],
                  bullets: immutabledict[Position, FrozenSet[Bullet]] = immutabledict(),
                  be_training: bool = True) -> None:
-        self.universe = universe
+        self.grid_royale = grid_royale
         self.player_infos = player_infos
         self.bullets = bullets
         assert all(bullets.values()) # No empty sets there.
@@ -170,7 +168,7 @@ class State(_BaseGrid, gamey.NiceState):
 
 
     @staticmethod
-    def make_initial(universe: Universe, strategies: Tuple[Strategy], board_size: int = 24,
+    def make_initial(grid_royale: GridRoyale, strategies: Tuple[Strategy], board_size: int = 24,
                      starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40,
                      be_training: bool = True) -> State:
 
@@ -197,7 +195,7 @@ class State(_BaseGrid, gamey.NiceState):
             )
 
         state = State(
-            universe=universe,
+            grid_royale=grid_royale,
             board_size=board_size,
             player_infos=immutabledict(player_infos),
             food_positions=food_positions,
@@ -348,7 +346,7 @@ class State(_BaseGrid, gamey.NiceState):
 
             reward = (
                 SHOT_REWARD if new_player_position in new_player_positions_that_were_shot else
-                self.universe.get_collision_reward(old_player_info.strategy)
+                self.grid_royale.get_collision_reward(old_player_info.strategy)
                                             if new_player_position in collided_player_positions else
                 FOOD_REWARD if new_player_position in new_player_positions_that_ate_food else
                 NOTHING_REWARD
@@ -369,7 +367,7 @@ class State(_BaseGrid, gamey.NiceState):
 
 
         state = State(
-            universe=self.universe, board_size=self.board_size,
+            grid_royale=self.grid_royale, board_size=self.board_size,
             player_infos=immutabledict(player_infos), food_positions=frozenset(wip_food_positions),
             be_training=self.be_training, bullets=bullets
         )
@@ -389,7 +387,7 @@ class State(_BaseGrid, gamey.NiceState):
                     player_info.observation
                 )
                 if old_player_info.strategy.training_data.is_training_time():
-                    old_player_info.strategy.train(executor=self.universe.executor)
+                    old_player_info.strategy.train(executor=self.grid_royale.executor)
                 assert not old_player_info.strategy.training_data.is_training_time()
 
 
@@ -509,8 +507,6 @@ class State(_BaseGrid, gamey.NiceState):
 
 class Observation(_BaseGrid, gamey.Observation):
 
-    action_type = Action
-
     def __init__(self, state: Optional[State], position: Position, *,
                  letter: str, score: int, last_action: Optional[Action],
                  reward: int = 0) -> None:
@@ -549,8 +545,8 @@ class Observation(_BaseGrid, gamey.Observation):
         return self.state.board_size
 
     @property
-    def universe(self) -> Universe:
-        return self.state.universe
+    def grid_royale(self) -> GridRoyale:
+        return self.state.grid_royale
 
     n_neurons = (
         # + 1 # Score
@@ -588,13 +584,13 @@ class Observation(_BaseGrid, gamey.Observation):
             elif (player := self.state.player_infos.get(absolute_position, None)):
                 player: PlayerInfo
                 array[tuple(relative_position) +
-                      (6 + self.universe.core_strategies.index(player.strategy),)] = 1
+                      (6 + self.grid_royale.core_strategies.index(player.strategy),)] = 1
 
         return array
 
     @functools.lru_cache()
     def to_neurons(self) -> np.ndarray:
-        last_action_neurons = (np.zeros(len(self.action_type)) if self.last_action is None
+        last_action_neurons = (np.zeros(len(Action)) if self.last_action is None
                                else self.last_action.to_neurons())
         return np.concatenate((
             np.array(
@@ -639,7 +635,7 @@ class Observation(_BaseGrid, gamey.Observation):
             distances_to_other_players.append(float('inf'))
 
 
-        for strategy in self.universe.core_strategies:
+        for strategy in self.grid_royale.core_strategies:
             for i, positions in enumerate(field_of_view, start=1):
                 player_infos = (
                     self.state.player_infos.get(position, None) for position in
@@ -701,9 +697,11 @@ logging.getLogger('tensorflow').addFilter(
     lambda record: 'Tracing is expensive and the excessive' not in record.msg
 )
 
-class SimpleStrategy(gamey.Strategy):
+class _GridRoyaleStrategy(gamey.Strategy):
+    Game = GridRoyale
 
-    observation_type = Observation
+
+class SimpleStrategy(_GridRoyaleStrategy):
 
     def __init__(self, epsilon: int = 0.2):
         self.epsilon = epsilon
@@ -727,16 +725,14 @@ class SimpleStrategy(gamey.Strategy):
 
 
 
-class Strategy(gamey.ModelFreeLearningStrategy):
+class Strategy(_GridRoyaleStrategy):
 
-    observation_type = Observation
-
-    def __init__(self, universe: Universe, **kwargs) -> None:
-        self.universe = universe
+    def __init__(self, grid_royale: GridRoyale, **kwargs) -> None:
+        self.grid_royale = grid_royale
         gamey.ModelFreeLearningStrategy.__init__(self, training_batch_size=10, **kwargs)
 
     def get_aggro(self, n_states: int = 100) -> numbers.Real:
-        iterator = itertools.cycle(self.universe.core_strategies)
+        iterator = itertools.cycle(self.grid_royale.core_strategies)
         return self._analyze(
             lambda observation: observation.reward < NOTHING_REWARD,
             n_states=n_states, competing_strategy_factory=lambda: next(iterator)
@@ -758,7 +754,7 @@ class Strategy(gamey.ModelFreeLearningStrategy):
             n_observations = 0
             score = 0
             initial_states = [
-                State.make_initial(self.universe, strategies,
+                State.make_initial(self.grid_royale, strategies,
                                             starting_score=10 ** 6, be_training=False)
                 for _ in range(3)
             ]
@@ -792,7 +788,7 @@ class Strategy(gamey.ModelFreeLearningStrategy):
                                                 strategy=self,)
             })
             state = State(
-                self.universe, board_size=24, player_infos=player_infos,
+                self.grid_royale, board_size=24, player_infos=player_infos,
                 food_positions=frozenset(food_positions), be_training=False
             )
             observation.state = state
@@ -854,7 +850,11 @@ class Strategy(gamey.ModelFreeLearningStrategy):
 
 
 
-class Universe:
+class GridRoyale(gamey.Game):
+    State = State
+    Observation = Observation
+    Action = Action
+
     def __init__(self, n_players: int = 20):
         self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
         self.strategies = tuple(more_itertools.islice_extended(
@@ -883,21 +883,21 @@ class Universe:
 
 state = None
 strategies = None
-universe = None
+grid_royale = None
 
 def run():
-    global universe, state, strategies
-    universe = Universe()
+    global grid_royale, state, strategies
+    grid_royale = GridRoyale()
 
-    # for _ in universe.train(n=2, max_game_length=100):
+    # for _ in grid_royale.train(n=2, max_game_length=100):
         # pass
-    state = universe.make_initial()
+    state = grid_royale.make_initial()
     for i in range(2_000):
         # states = []
         for state in state.write_to_pal(chunk=50):
             # states.append(state)
             # print(f'{state.average_reward:.02f}')
-            print(universe.core_strategies[0].measure())
+            print(grid_royale.core_strategies[0].measure())
 
 
 
