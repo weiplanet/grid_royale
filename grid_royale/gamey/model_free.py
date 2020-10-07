@@ -182,7 +182,7 @@ class ModelFreeLearningStrategy(QStrategy):
             )
             check_action_legality = True
         prediction_output = self.model.predict(input_array)
-        actions = tuple(self.Game.Action)
+        actions = tuple(self.State.Action)
         if check_action_legality:
             return tuple(
                 {action: q for action, q in dict(zip(actions, output_row)).items()

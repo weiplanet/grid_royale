@@ -222,8 +222,8 @@ def demo(n_training_games: int = 1_000) -> None:
 
     # model_free_learning_strategy.get_score(n=1_000)
     learning_strategies = [
-        ModelBasedEpisodicLearningStrategy(gamma=1),
-        ModelFreeLearningStrategy(gamma=1)
+        ModelBasedEpisodicLearningStrategy(),
+        # ModelFreeLearningStrategy(gamma=1)
     ]
     strategies = [
         RandomStrategy(),
