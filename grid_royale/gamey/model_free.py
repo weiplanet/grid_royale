@@ -96,7 +96,7 @@ class ModelFreeLearningStrategy(QStrategy):
             layers=(
                 keras.layers.Dense(
                     128, activation='relu',
-                    input_dim=self.Game.Observation.n_neurons
+                    input_dim=self.State.Observation.n_neurons
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
@@ -108,7 +108,7 @@ class ModelFreeLearningStrategy(QStrategy):
                 ),
                 keras.layers.Dropout(rate=0.1),
                 keras.layers.Dense(
-                     self.Game.Action.n_neurons, # activation='relu'
+                     self.State.Action.n_neurons, # activation='relu'
                 ),
 
             ),

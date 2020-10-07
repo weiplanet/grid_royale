@@ -720,7 +720,7 @@ class GridRoyaleCulture(gamey.Culture):
 
 
 class _GridRoyaleStrategy(gamey.Strategy):
-    Game = GridRoyale
+    State = State
 
 
 class SimpleStrategy(_GridRoyaleStrategy):

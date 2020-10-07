@@ -130,8 +130,13 @@ class State(abc.ABC):
         raise NotImplementedError
 
 
+class _SinglePlayerStateType(type):
+    @property
+    def Observation(cls) -> _SinglePlayerStateType:
+        return cls
 
-class SinglePlayerState(State, Observation):
+
+class SinglePlayerState(State, Observation, metaclass=_SinglePlayerStateType):
 
     player_id_to_observation = property(lambda self: ImmutableDict({None: self}))
 

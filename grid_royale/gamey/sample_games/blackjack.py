@@ -171,7 +171,7 @@ class BlackjackState(gamey.SinglePlayerState):
 
 
 class BlackjackStrategy(gamey.Strategy):
-    State = State
+    State = BlackjackState
 
 
 class AlwaysHitStrategy(BlackjackStrategy):
