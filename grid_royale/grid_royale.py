@@ -21,7 +21,7 @@ import numbers
 import io
 import collections
 from typing import (Optional, Tuple, Union, Container, Hashable, Iterator,
-                    Iterable, Any, Dict, FrozenSet, Callable, Type)
+                    Iterable, Any, Dict, FrozenSet, Callable, Type, Sequence)
 import dataclasses
 import datetime as datetime_module
 
@@ -655,8 +655,11 @@ logging.getLogger('tensorflow').addFilter(
 
 class Culture(gamey.Culture):
 
-    def __init__(self, n_players: int = 20):
-        self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
+    def __init__(self, n_players: int = 20, *,
+                 core_strategies: Optional[Sequence[_GridRoyaleStrategy]] = None):
+
+        self.core_strategies = tuple(core_strategies or (Strategy(self) for _
+                                                         in range(N_CORE_STRATEGIES)))
         self.strategies = tuple(more_itertools.islice_extended(
                                                  itertools.cycle(self.core_strategies))[:n_players])
         self.executor = concurrent.futures.ProcessPoolExecutor(5)
@@ -672,6 +675,9 @@ class Culture(gamey.Culture):
 
     def make_initial(self) -> State:
         return State.make_initial(self, self.strategies)
+
+
+
 
 
 class _GridRoyaleStrategy(gamey.Strategy):
@@ -755,16 +761,14 @@ class Strategy(_GridRoyaleStrategy):
     def get_neurons_of_sample_states_and_best_actions(self) -> Tuple[np.ndarray,
                                                                      Tuple[Action, ...]]:
 
+        culture = Culture(n_players=1, core_strategies=(self,))
         def make_state(player_position: Position,
                        food_positions: Iterable[Position]) -> State:
             observation = Observation(None, player_position, letter=LETTERS[0],
-                                                score=10 ** 6, reward=0, last_action=None)
-            player_infos = ImmutableDict({
-                player_position: PlayerInfo(id=player_position, observation=observation,
-                                                strategy=self,)
-            })
+                                      score=10 ** 6, reward=0, last_action=None)
+            letter_to_observation = ImmutableDict({observation.letter: observation})
             state = State(
-                self.culture, board_size=24, player_infos=player_infos,
+                culture, board_size=24, letter_to_observation=letter_to_observation,
                 food_positions=frozenset(food_positions), be_training=False
             )
             observation.state = state
@@ -794,15 +798,15 @@ class Strategy(_GridRoyaleStrategy):
                                 [player_position + distance * step for distance in distances])
                 )
 
-        observations = [more_itertools.one(state.player_infos.values()).observation
-                         for state in states]
+        observations = [more_itertools.one(state.letter_to_observation.values())
+                        for state in states]
 
         def _get_cute_score_for_action(observation: Observation,
                                        legal_move_action: Action) -> int:
             next_state = observation.state. \
                    get_next_state_from_actions({observation.position: legal_move_action})
             return more_itertools.one(
-                            next_state.player_infos.values()).observation.cute_score
+                                   next_state.letter_to_observation.values()).observation.cute_score
 
         return tuple((
             np.concatenate([observation.to_neurons()[np.newaxis, :] for
