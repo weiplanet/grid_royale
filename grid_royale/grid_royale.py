@@ -118,7 +118,192 @@ class _BaseGrid:
 
 
 
+class Observation(_BaseGrid, gamey.Observation):
+
+    def __init__(self, state: Optional[State], position: Position, *,
+                 letter: str, score: int, last_action: Optional[Action],
+                 reward: int = 0) -> None:
+        assert len(letter) == 1
+        self.state = state
+        self.position = position
+        self.letter = letter.upper()
+        self.score = score
+        self.reward = reward
+        self.last_action = last_action
+        self.is_end = (score <= 0)
+
+
+    @property
+    def legal_actions(self) -> Tuple[Action, ...]:
+        if self.is_end:
+            return ()
+        actions = list(Action.all_shoot_actions)
+        if self.position.y >= 1:
+            actions.append(Action.up)
+        if self.position.x <= self.board_size - 2:
+            actions.append(Action.right)
+        if self.position.y <= self.board_size - 2:
+            actions.append(Action.down)
+        if self.position.x >= 1:
+            actions.append(Action.left)
+        return tuple(actions)
+
+    @property
+    def legal_move_actions(self) -> Tuple[Action, ...]:
+        return tuple(action for action in self.legal_actions if (action.move is not None))
+
+
+    @property
+    def board_size(self) -> int:
+        return self.state.board_size
+
+    @property
+    def culture(self) -> Culture:
+        return self.state.culture
+
+    n_neurons = (
+        # + 1 # Score
+        + 8 # Last action
+        + 8 * ( # The following for each vicinity
+            + 1 # Distance to closest player of each strategy
+            + N_CORE_STRATEGIES # Distance to closest player of each strategy
+            + 1 # Distance to closest food
+            + 4 # Distance to closest bullet in each direction
+            + 1 # Distance to closest wall
+        )
+        + VISION_SIZE ** 2 * ( # Simple vision
+            + 1 # Wall
+            + 1 # Food
+            + 4 # Bullets in each direction
+            + N_CORE_STRATEGIES # Players of each strategy
+        )
+    )
+
+    @property
+    def simple_vision(self):
+        array = np.zeros((VISION_SIZE, VISION_SIZE, 1 + 1 + 4 + N_CORE_STRATEGIES), dtype=int)
+        relative_player_position = Position(VISION_SIZE // 2, VISION_SIZE // 2)
+        translation = relative_player_position - self.position
+
+        for relative_position in Position.iterate_all(VISION_SIZE):
+            absolute_position: Position = relative_position - translation
+            if absolute_position not in self:
+                array[tuple(relative_position) + (0,)] = 1
+            elif absolute_position in self.state.food_positions:
+                array[tuple(relative_position) + (1,)] = 1
+            elif (bullets := self.state.bullets.get(absolute_position, None)):
+                for bullet in bullets:
+                    array[tuple(relative_position) + (2 + bullet.direction.index,)] = 1
+            elif (observation := self.state.living_player_positions.get(absolute_position, None)):
+                array[tuple(relative_position) +
+                      (6 + self.culture.core_strategies.index(player.strategy),)] = 1
+
+        return array
+
+    @functools.lru_cache()
+    def to_neurons(self) -> np.ndarray:
+        last_action_neurons = (np.zeros(len(Action)) if self.last_action is None
+                               else self.last_action.to_neurons())
+        return np.concatenate((
+            np.array(
+                tuple(
+                    itertools.chain.from_iterable(
+                        self.processed_distances_to_food_players_bullets(vicinity) for
+                        vicinity in Vicinity.all_vicinities
+                    )
+                )
+            ),
+            np.array(
+                tuple(
+                    self.processed_distance_to_wall(vicinity) for vicinity in
+                    Vicinity.all_vicinities
+                )
+            ),
+            last_action_neurons,
+            self.simple_vision.flatten(),
+            # (scipy.special.expit(self.score / 10),),
+        ))
+
+    _distance_base = 1.2
+
+    @functools.lru_cache()
+    def processed_distances_to_food_players_bullets(self, vicinity: Vicinity) -> numbers.Real:
+        field_of_view = self.position.field_of_view(vicinity, self.board_size)
+
+        for distance_to_food, positions in enumerate(field_of_view, start=1):
+            if positions & self.state.food_positions:
+                break
+        else:
+            distance_to_food = float('inf')
+
+
+        distances_to_other_players = []
+
+        for i, positions in enumerate(field_of_view, start=1):
+            if positions & self.state.living_player_positions:
+                distances_to_other_players.append(i)
+                break
+        else:
+            distances_to_other_players.append(float('inf'))
+
+
+        for strategy in self.culture.core_strategies:
+            for i, positions in enumerate(field_of_view, start=1):
+                strategies = (
+                    self.culture.player_id_to_strategy[observation.letter]
+                    for position in positions if (observation :=
+                                 self.state.living_player_positions.get(position, None)) is not None
+                )
+                if strategy in strategies:
+                    distances_to_other_players.append(i)
+                    break
+            else:
+                distances_to_other_players.append(float('inf'))
+
+        assert len(distances_to_other_players) == N_CORE_STRATEGIES + 1
+
+        distances_to_bullets = []
+        for direction in Step.all_steps:
+            for i, positions in enumerate(field_of_view, start=1):
+                bullets = itertools.chain.from_iterable(
+                    self.state.bullets.get(position, ()) for position in positions
+                )
+                if any(bullet.direction == direction for bullet in bullets):
+                    distances_to_bullets.append(i)
+                    break
+            else:
+                distances_to_bullets.append(float('inf'))
+
+
+        return tuple(self._distance_base ** (-distance)
+                     for distance in ([distance_to_food] + distances_to_other_players +
+                                      distances_to_bullets))
+
+
+    @functools.lru_cache()
+    def processed_distance_to_wall(self, vicinity: Vicinity) -> numbers.Real:
+        position = self.position
+        for i in itertools.count():
+            if position not in self:
+                distance_to_wall = i
+                break
+            position += vicinity
+        return 1.2 ** (-distance_to_wall)
+
+    @property
+    def cute_score(self) -> int:
+        return self.score - min((self.position @ food_position
+                                for food_position in self.state.food_positions),
+                                default=(-100))
+
+    def p(self) -> None:
+        print(self.ascii)
+
+
 class State(_BaseGrid, gamey.State):
+
+    Observation = Observation
+    Action = Action
 
     def __init__(self, culture: Culture, *, board_size: int,
                  letter_to_observation: ImmutableDict[str, Observation],
@@ -461,187 +646,6 @@ class State(_BaseGrid, gamey.State):
 
 
 
-
-class Observation(_BaseGrid, gamey.Observation):
-
-    def __init__(self, state: Optional[State], position: Position, *,
-                 letter: str, score: int, last_action: Optional[Action],
-                 reward: int = 0) -> None:
-        assert len(letter) == 1
-        self.state = state
-        self.position = position
-        self.letter = letter.upper()
-        self.score = score
-        self.reward = reward
-        self.last_action = last_action
-        self.is_end = (score <= 0)
-
-
-    @property
-    def legal_actions(self) -> Tuple[Action, ...]:
-        if self.is_end:
-            return ()
-        actions = list(Action.all_shoot_actions)
-        if self.position.y >= 1:
-            actions.append(Action.up)
-        if self.position.x <= self.board_size - 2:
-            actions.append(Action.right)
-        if self.position.y <= self.board_size - 2:
-            actions.append(Action.down)
-        if self.position.x >= 1:
-            actions.append(Action.left)
-        return tuple(actions)
-
-    @property
-    def legal_move_actions(self) -> Tuple[Action, ...]:
-        return tuple(action for action in self.legal_actions if (action.move is not None))
-
-
-    @property
-    def board_size(self) -> int:
-        return self.state.board_size
-
-    @property
-    def culture(self) -> Culture:
-        return self.state.culture
-
-    n_neurons = (
-        # + 1 # Score
-        + 8 # Last action
-        + 8 * ( # The following for each vicinity
-            + 1 # Distance to closest player of each strategy
-            + N_CORE_STRATEGIES # Distance to closest player of each strategy
-            + 1 # Distance to closest food
-            + 4 # Distance to closest bullet in each direction
-            + 1 # Distance to closest wall
-        )
-        + VISION_SIZE ** 2 * ( # Simple vision
-            + 1 # Wall
-            + 1 # Food
-            + 4 # Bullets in each direction
-            + N_CORE_STRATEGIES # Players of each strategy
-        )
-    )
-
-    @property
-    def simple_vision(self):
-        array = np.zeros((VISION_SIZE, VISION_SIZE, 1 + 1 + 4 + N_CORE_STRATEGIES), dtype=int)
-        relative_player_position = Position(VISION_SIZE // 2, VISION_SIZE // 2)
-        translation = relative_player_position - self.position
-
-        for relative_position in Position.iterate_all(VISION_SIZE):
-            absolute_position: Position = relative_position - translation
-            if absolute_position not in self:
-                array[tuple(relative_position) + (0,)] = 1
-            elif absolute_position in self.state.food_positions:
-                array[tuple(relative_position) + (1,)] = 1
-            elif (bullets := self.state.bullets.get(absolute_position, None)):
-                for bullet in bullets:
-                    array[tuple(relative_position) + (2 + bullet.direction.index,)] = 1
-            elif (observation := self.state.living_player_positions.get(absolute_position, None)):
-                array[tuple(relative_position) +
-                      (6 + self.culture.core_strategies.index(player.strategy),)] = 1
-
-        return array
-
-    @functools.lru_cache()
-    def to_neurons(self) -> np.ndarray:
-        last_action_neurons = (np.zeros(len(Action)) if self.last_action is None
-                               else self.last_action.to_neurons())
-        return np.concatenate((
-            np.array(
-                tuple(
-                    itertools.chain.from_iterable(
-                        self.processed_distances_to_food_players_bullets(vicinity) for
-                        vicinity in Vicinity.all_vicinities
-                    )
-                )
-            ),
-            np.array(
-                tuple(
-                    self.processed_distance_to_wall(vicinity) for vicinity in
-                    Vicinity.all_vicinities
-                )
-            ),
-            last_action_neurons,
-            self.simple_vision.flatten(),
-            # (scipy.special.expit(self.score / 10),),
-        ))
-
-    _distance_base = 1.2
-
-    @functools.lru_cache()
-    def processed_distances_to_food_players_bullets(self, vicinity: Vicinity) -> numbers.Real:
-        field_of_view = self.position.field_of_view(vicinity, self.board_size)
-
-        for distance_to_food, positions in enumerate(field_of_view, start=1):
-            if positions & self.state.food_positions:
-                break
-        else:
-            distance_to_food = float('inf')
-
-
-        distances_to_other_players = []
-
-        for i, positions in enumerate(field_of_view, start=1):
-            if positions & self.state.living_player_positions:
-                distances_to_other_players.append(i)
-                break
-        else:
-            distances_to_other_players.append(float('inf'))
-
-
-        for strategy in self.culture.core_strategies:
-            for i, positions in enumerate(field_of_view, start=1):
-                strategies = (
-                    self.culture.player_id_to_strategy[observation.letter]
-                    for position in positions if (observation :=
-                                 self.state.living_player_positions.get(position, None)) is not None
-                )
-                if strategy in strategies:
-                    distances_to_other_players.append(i)
-                    break
-            else:
-                distances_to_other_players.append(float('inf'))
-
-        assert len(distances_to_other_players) == N_CORE_STRATEGIES + 1
-
-        distances_to_bullets = []
-        for direction in Step.all_steps:
-            for i, positions in enumerate(field_of_view, start=1):
-                bullets = itertools.chain.from_iterable(
-                    self.state.bullets.get(position, ()) for position in positions
-                )
-                if any(bullet.direction == direction for bullet in bullets):
-                    distances_to_bullets.append(i)
-                    break
-            else:
-                distances_to_bullets.append(float('inf'))
-
-
-        return tuple(self._distance_base ** (-distance)
-                     for distance in ([distance_to_food] + distances_to_other_players +
-                                      distances_to_bullets))
-
-
-    @functools.lru_cache()
-    def processed_distance_to_wall(self, vicinity: Vicinity) -> numbers.Real:
-        position = self.position
-        for i in itertools.count():
-            if position not in self:
-                distance_to_wall = i
-                break
-            position += vicinity
-        return 1.2 ** (-distance_to_wall)
-
-    @property
-    def cute_score(self) -> int:
-        return self.score - min((self.position @ food_position
-                                for food_position in self.state.food_positions),
-                                default=(-100))
-
-    def p(self) -> None:
-        print(self.ascii)
 
 logging.getLogger('tensorflow').addFilter(
     lambda record: 'Tracing is expensive and the excessive' not in record.msg
