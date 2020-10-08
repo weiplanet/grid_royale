@@ -120,12 +120,12 @@ class _BaseGrid:
 
 class State(_BaseGrid, gamey.State):
 
-    def __init__(self, grid_royale_culture: GridRoyaleCulture, *, board_size: int,
+    def __init__(self, culture: Culture, *, board_size: int,
                  letter_to_observation: ImmutableDict[str, Observation],
                  food_positions: FrozenSet[Position],
                  bullets: ImmutableDict[Position, FrozenSet[Bullet]] = ImmutableDict(),
                  be_training: bool = True) -> None:
-        self.grid_royale_culture = grid_royale_culture
+        self.culture = culture
         self.letter_to_observation = letter_to_observation
         self.bullets = bullets
         assert all(bullets.values()) # No empty sets there.
@@ -158,7 +158,7 @@ class State(_BaseGrid, gamey.State):
 
 
     @staticmethod
-    def make_initial(grid_royale: GridRoyaleCulture, board_size: int = 24,
+    def make_initial(culture: Culture, board_size: int = 24,
                      starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40,
                      be_training: bool = True) -> State:
 
@@ -181,7 +181,7 @@ class State(_BaseGrid, gamey.State):
                                                         last_action=None),
 
         state = State(
-            grid_royale=grid_royale_culture,
+            culture=culture,
             board_size=board_size,
             letter_to_observation=ImmutableDict(letter_to_observation),
             food_positions=food_positions,
@@ -351,7 +351,7 @@ class State(_BaseGrid, gamey.State):
 
 
         state = State(
-            grid_royale=self.grid_royale_culture, board_size=self.board_size,
+            culture=self.culture, board_size=self.board_size,
             letter_to_observation=ImmutableDict(letter_to_observation),
             food_positions=frozenset(wip_food_positions),
             be_training=self.be_training, bullets=bullets
@@ -508,8 +508,8 @@ class Observation(_BaseGrid, gamey.Observation):
         return self.state.board_size
 
     @property
-    def grid_royale_culture(self) -> GridRoyaleCulture:
-        return self.state.grid_royale_culture
+    def culture(self) -> Culture:
+        return self.state.culture
 
     n_neurons = (
         # + 1 # Score
@@ -546,7 +546,7 @@ class Observation(_BaseGrid, gamey.Observation):
                     array[tuple(relative_position) + (2 + bullet.direction.index,)] = 1
             elif (observation := self.state.living_player_positions.get(absolute_position, None)):
                 array[tuple(relative_position) +
-                      (6 + self.grid_royale_culture.core_strategies.index(player.strategy),)] = 1
+                      (6 + self.culture.core_strategies.index(player.strategy),)] = 1
 
         return array
 
@@ -597,13 +597,14 @@ class Observation(_BaseGrid, gamey.Observation):
             distances_to_other_players.append(float('inf'))
 
 
-        for strategy in self.grid_royale.core_strategies:
+        for strategy in self.culture.core_strategies:
             for i, positions in enumerate(field_of_view, start=1):
-                player_infos = (
-                    self.state.player_infos.get(position, None) for position in
-                    positions & self.state.living_player_positions
+                strategies = (
+                    self.culture.player_id_to_strategy[observation.letter]
+                    for position in positions if (observation :=
+                                 self.state.living_player_positions.get(position, None)) is not None
                 )
-                if strategy in (player_info.strategy for player_info in player_infos):
+                if strategy in strategies:
                     distances_to_other_players.append(i)
                     break
             else:
@@ -652,7 +653,7 @@ logging.getLogger('tensorflow').addFilter(
     lambda record: 'Tracing is expensive and the excessive' not in record.msg
 )
 
-class GridRoyaleCulture(gamey.Culture):
+class Culture(gamey.Culture):
 
     def __init__(self, n_players: int = 20):
         self.core_strategies = tuple(Strategy(self) for _ in range(N_CORE_STRATEGIES))
@@ -703,53 +704,52 @@ class SimpleStrategy(_GridRoyaleStrategy):
 
 class Strategy(_GridRoyaleStrategy):
 
-    def __init__(self, grid_royale: GridRoyale, **kwargs) -> None:
-        self.grid_royale = grid_royale
+    def __init__(self, culture: Culture, **kwargs) -> None:
+        self.culture = culture
         gamey.ModelFreeLearningStrategy.__init__(self, training_batch_size=10, **kwargs)
 
-    def get_aggro(self, n_states: int = 100) -> numbers.Real:
-        iterator = itertools.cycle(self.grid_royale.core_strategies)
-        return self._analyze(
-            lambda observation: observation.reward < NOTHING_REWARD,
-            n_states=n_states, competing_strategy_factory=lambda: next(iterator)
-        )
+    # def get_aggro(self, n_states: int = 100) -> numbers.Real:
+        # iterator = itertools.cycle(self.culture.core_strategies)
+        # return self._analyze(
+            # lambda observation: observation.reward < NOTHING_REWARD,
+            # n_states=n_states, competing_strategy_factory=lambda: next(iterator)
+        # )
 
-    def get_munch(self, n_states: int = 100) -> numbers.Real:
-        return self._analyze(
-            lambda observation: observation.reward == FOOD_REWARD,
-            n_states=n_states
-        )
+    # def get_munch(self, n_states: int = 100) -> numbers.Real:
+        # return self._analyze(
+            # lambda observation: observation.reward == FOOD_REWARD,
+            # n_states=n_states
+        # )
 
 
-    def _analyze(self, evaluate_state: Callable, n_states: int = 100,
-                 n_other_players: int = 10,
-                 competing_strategy_factory: Callable[[], gamey.Strategy]
-                                   = lambda: gamey.RandomStrategy(Observation)) -> numbers.Real:
-        with utils.time():
-            strategies = [self] + [competing_strategy_factory()] * n_other_players
-            n_observations = 0
-            score = 0
-            initial_states = [
-                State.make_initial(self.grid_royale, strategies,
-                                            starting_score=10 ** 6, be_training=False)
-                for _ in range(3)
-            ]
-            iterator = more_itertools.interleave_longest(
-                *(initial_state.iterate_states() for
-                  initial_state in initial_states)
-            )
-            for state in iterator:
-                state: State
-                (observation,) = [
-                    observation for player_info in state.player_infos.values()
-                    if (observation := player_info.observation).letter == LETTERS[0]
-                ]
-                n_observations += 1
-                score += evaluate_state(observation)
-                if n_observations >= n_states:
-                    return score / n_observations
-            else:
-                raise NotImplementedError
+    # def _analyze(self, evaluate_state: Callable, n_states: int = 100,
+                 # n_other_players: int = 10,
+                 # competing_strategy_factory: Callable[[], gamey.Strategy]
+                                   # = lambda: gamey.RandomStrategy(Observation)) -> numbers.Real:
+        # strategies = [self] + [competing_strategy_factory()] * n_other_players
+        # n_observations = 0
+        # score = 0
+        # initial_states = [
+            # State.make_initial(self.culture, strategies,
+                                        # starting_score=10 ** 6, be_training=False)
+            # for _ in range(3)
+        # ]
+        # iterator = more_itertools.interleave_longest(
+            # *(initial_state.iterate_states() for
+              # initial_state in initial_states)
+        # )
+        # for state in iterator:
+            # state: State
+            # (observation,) = [
+                # observation for player_info in state.player_infos.values()
+                # if (observation := player_info.observation).letter == LETTERS[0]
+            # ]
+            # n_observations += 1
+            # score += evaluate_state(observation)
+            # if n_observations >= n_states:
+                # return score / n_observations
+        # else:
+            # raise NotImplementedError
 
     @functools.lru_cache()
     def get_neurons_of_sample_states_and_best_actions(self) -> Tuple[np.ndarray,
@@ -764,7 +764,7 @@ class Strategy(_GridRoyaleStrategy):
                                                 strategy=self,)
             })
             state = State(
-                self.grid_royale, board_size=24, player_infos=player_infos,
+                self.culture, board_size=24, player_infos=player_infos,
                 food_positions=frozenset(food_positions), be_training=False
             )
             observation.state = state
@@ -832,21 +832,21 @@ class Strategy(_GridRoyaleStrategy):
 
 state = None
 strategies = None
-grid_royale_culture = None
+culture = None
 
 def run():
-    global grid_royale_culture, state, strategies
-    grid_royale_culture = GridRoyale()
+    global culture, state, strategies
+    culture = Culture()
 
-    # for _ in grid_royale.train(n=2, max_length=100):
+    # for _ in culture.train(n=2, max_length=100):
         # pass
-    state = grid_royale_culture.make_initial()
+    state = culture.make_initial()
     for i in range(2_000):
         # states = []
         for state in state.write_to_pal(chunk=50):
             # states.append(state)
             # print(f'{state.average_reward:.02f}')
-            print(grid_royale_culture.core_strategies[0].measure())
+            print(culture.core_strategies[0].measure())
 
 
 
