@@ -123,8 +123,7 @@ class State(_BaseGrid, gamey.State):
     def __init__(self, culture: Culture, *, board_size: int,
                  letter_to_observation: ImmutableDict[str, Observation],
                  food_positions: FrozenSet[Position],
-                 bullets: ImmutableDict[Position, FrozenSet[Bullet]] = ImmutableDict(),
-                 be_training: bool = True) -> None:
+                 bullets: ImmutableDict[Position, FrozenSet[Bullet]] = ImmutableDict()) -> None:
         self.culture = culture
         self.letter_to_observation = letter_to_observation
         self.bullets = bullets
@@ -137,7 +136,6 @@ class State(_BaseGrid, gamey.State):
              if not observation.is_end}
         )
         self.is_end = not self.living_player_positions
-        self.be_training = be_training
 
     def _reduce(self) -> tuple:
         return (
@@ -158,9 +156,8 @@ class State(_BaseGrid, gamey.State):
 
 
     @staticmethod
-    def make_initial(culture: Culture, board_size: int = 24,
-                     starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40,
-                     be_training: bool = True) -> State:
+    def make_initial(culture: Culture, *, board_size: int = 24,
+                     starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40) -> State:
 
         n_players = len(strategies)
         random_positions_firehose = utils.iterate_deduplicated(
@@ -185,7 +182,6 @@ class State(_BaseGrid, gamey.State):
             board_size=board_size,
             letter_to_observation=ImmutableDict(letter_to_observation),
             food_positions=food_positions,
-            be_training=be_training,
         )
 
         for observation in letter_to_observation.values():
@@ -353,8 +349,7 @@ class State(_BaseGrid, gamey.State):
         state = State(
             culture=self.culture, board_size=self.board_size,
             letter_to_observation=ImmutableDict(letter_to_observation),
-            food_positions=frozenset(wip_food_positions),
-            be_training=self.be_training, bullets=bullets
+            food_positions=frozenset(wip_food_positions), bullets=bullets
         )
 
         for observation in letter_to_observation.values():
@@ -431,8 +426,7 @@ class State(_BaseGrid, gamey.State):
         ### Finished preparing folder. ########################################
 
         paths = ((folder / f'{i:06d}.json') for i in range(10 ** 6))
-        state_iterator = more_itertools.islice_extended(
-                                                      self.iterate_states())[:max_length]
+        state_iterator = more_itertools.islice_extended(self.culture.b())[:max_length]
         for path in paths:
             state_chunk = []
             for state in more_itertools.islice_extended(state_iterator)[:chunk]:
@@ -769,7 +763,7 @@ class Strategy(_GridRoyaleStrategy):
             letter_to_observation = ImmutableDict({observation.letter: observation})
             state = State(
                 culture, board_size=24, letter_to_observation=letter_to_observation,
-                food_positions=frozenset(food_positions), be_training=False
+                food_positions=frozenset(food_positions)
             )
             observation.state = state
             return state

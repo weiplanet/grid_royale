@@ -159,25 +159,27 @@ class Culture:
 
 
     def iterate_many_games(self, *, n: int = 10, max_length: int = 100,
-                           state_factory: Optional[Callable] = None) -> Iterator[State]:
+                           state_factory: Optional[Callable] = None, be_training: bool = True) \
+                                                                                 -> Iterator[State]:
         state_factory = ((lambda: self.State.make_initial()) if state_factory is None
                          else state_factory)
         for i in range(n):
             state: State = state_factory()
-            yield from self.iterate_game(state, max_length)
+            yield from self.iterate_game(state, max_length, be_training=be_training)
 
 
-    def iterate_game(self, state: State, max_length: Optional[int] = None) -> Iterator[State]:
+    def iterate_game(self, state: State, max_length: Optional[int] = None, *,
+                     be_training: bool = True) -> Iterator[State]:
         yield state
         iterator = range(1, max_length) if max_length is not None else itertools.count(1)
         for i in iterator:
             if state.is_end:
                 return
-            state = self.get_next_state(state)
+            state = self.get_next_state(state, be_training=be_training)
             yield state
 
 
-    def get_next_state(self, state: State) -> State:
+    def get_next_state(self, state: State, *, be_training: bool = True) -> State:
         if state.is_end:
             raise exceptions.GameOver
         player_id_to_action = {
@@ -187,10 +189,11 @@ class Culture:
             if not observation.is_end
         }
         next_state = state.get_next_state_from_actions(player_id_to_action)
-        for player_id, action in player_id_to_action.items():
-            strategy = self.player_id_to_strategy[player_id]
-            observation = state.player_id_to_observation[player_id]
-            strategy.train(observation, action, next_state.player_id_to_observation[player_id])
+        if be_training:
+            for player_id, action in player_id_to_action.items():
+                strategy = self.player_id_to_strategy[player_id]
+                observation = state.player_id_to_observation[player_id]
+                strategy.train(observation, action, next_state.player_id_to_observation[player_id])
         return next_state
 
 
