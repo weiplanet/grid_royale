@@ -9,7 +9,7 @@ from typing import (Optional, Tuple, Union, Container, Hashable, Iterator,
 import numpy as np
 
 
-from . import grid_royale_culture
+from . import grid_royale
 
 
 @dataclasses.dataclass(frozen=True)
@@ -46,7 +46,7 @@ class Vector:
 
 class Position(Vector):
     @staticmethod
-    def iterate_all(state_or_board_size: Union[grid_royale_culture._BaseGrid, int], /):
+    def iterate_all(state_or_board_size: Union[grid_royale._BaseGrid, int], /):
         board_size: int = (state_or_board_size if isinstance(state_or_board_size, int)
                            else state_or_board_size.board_size)
         for y, x in itertools.product(range(board_size), repeat=2):
