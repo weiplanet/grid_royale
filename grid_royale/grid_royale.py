@@ -240,7 +240,8 @@ class Observation(_BaseGrid, gamey.Observation):
         distances_to_other_players = []
 
         for i, positions in enumerate(field_of_view, start=1):
-            if positions & self.state.living_player_positions:
+            if any((living_player_position in positions) for living_player_position in
+                   self.state.living_player_positions):
                 distances_to_other_players.append(i)
                 break
         else:
