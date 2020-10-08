@@ -360,7 +360,7 @@ class State(_BaseGrid, gamey.State):
         for player_position, letter in zip(player_positions, LETTERS):
             letter_to_observation[letter] = Observation(state=None, position=player_position,
                                                         score=starting_score, letter=letter,
-                                                        last_action=None),
+                                                        last_action=None)
 
         state = State(
             culture=culture,
