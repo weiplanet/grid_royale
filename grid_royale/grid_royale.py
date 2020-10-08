@@ -661,8 +661,8 @@ class Culture(gamey.Culture):
         self.strategies = tuple(more_itertools.islice_extended(
                                                  itertools.cycle(self.core_strategies))[:n_players])
         self.executor = concurrent.futures.ProcessPoolExecutor(5)
-        gamey.Culture.__init__(state_type=State,
-                               player_id_to_strategy=dict(zip(LETTERS, strategies)))
+        gamey.Culture.__init__(self, state_type=State,
+                               player_id_to_strategy=dict(zip(LETTERS, self.strategies)))
 
 
     def grind(self, *, n: int = 10, max_length: int = 100) -> Iterator[State]:
@@ -672,7 +672,7 @@ class Culture(gamey.Culture):
         )
 
     def make_initial(self) -> State:
-        return State.make_initial(self, self.strategies)
+        return State.make_initial(self)
 
 
 
