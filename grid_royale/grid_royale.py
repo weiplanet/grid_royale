@@ -344,7 +344,7 @@ class State(_BaseGrid, gamey.State):
     def make_initial(culture: Culture, *, board_size: int = 24,
                      starting_score: int = 10 ** 6, concurrent_food_tiles: int = 40) -> State:
 
-        n_players = len(strategies)
+        n_players = len(culture.strategies)
         random_positions_firehose = utils.iterate_deduplicated(
                                      State.iterate_random_positions(board_size=board_size))
         random_positions = tuple(
