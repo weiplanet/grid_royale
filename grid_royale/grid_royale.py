@@ -611,7 +611,7 @@ class State(_BaseGrid, gamey.State):
         ### Finished preparing folder. ########################################
 
         paths = ((folder / f'{i:06d}.json') for i in range(10 ** 6))
-        state_iterator = more_itertools.islice_extended(self.culture.b())[:max_length]
+        state_iterator = self.culture.iterate_game(self, max_length=max_length)
         for path in paths:
             state_chunk = []
             for state in more_itertools.islice_extended(state_iterator)[:chunk]:
