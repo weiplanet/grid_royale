@@ -702,7 +702,7 @@ class SimpleStrategy(_GridRoyaleStrategy):
 
 
 
-class Strategy(_GridRoyaleStrategy):
+class Strategy(_GridRoyaleStrategy, gamey.ModelFreeLearningStrategy):
 
     def __init__(self, culture: Culture, **kwargs) -> None:
         self.culture = culture
